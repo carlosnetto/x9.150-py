@@ -1,0 +1,81 @@
+{
+    "creditor": {
+        "name": "Big Burger Bar",
+        "phone": "+12135550006",
+        "email": "hello@bigburger.com",
+        "address": {
+            "line1": "789 Patty Blvd",
+            "city": "Los Angeles",
+            "state": "CA",
+            "postalCode": "90001",
+            "country": "US"
+        },
+        "MCC": "5812"
+    },
+    "bill": {
+        "description": "Lunch at Big Burger Bar",
+        "order": {
+            "number": "BB-2026-006",
+            "date": "2026-01-16"
+        },
+        "amountDue": {
+            "amount": 1875,
+            "currency": "USD"
+        },
+        "tip": {
+            "allowed": true,
+            "range": {
+                "min": 0,
+                "max": 25
+            },
+            "presets": [
+                15,
+                18,
+                20,
+                22
+            ]
+        },
+        "paymentTiming": "immediate"
+    },
+    "additionalInformation": [
+        {
+            "key": "Double Cheeseburger",
+            "value": "12.00"
+        },
+        {
+            "key": "Fries",
+            "value": "4.25"
+        },
+        {
+            "key": "Coke",
+            "value": "2.50"
+        }
+    ],
+    "paymentMethods": [
+        {
+            "currency": "USD",
+            "amount": 1875,
+            "networks": {
+                "FedNow": {
+                    "routingNumber": "123456789",
+                    "accountNumber": "9876543210",
+                    "protectionType": "tokenized"
+                },
+                "RTP": {
+                    "routingNumber": "123456789",
+                    "accountNumber": "9876543210",
+                    "protectionType": "tokenized"
+                }
+            }
+        },
+        {
+            "currency": "USDC",
+            "amount": 18750000,
+            "networks": {
+                "Base": {
+                    "address": "0xa6d0AeFeB0427E0011003BFD8486f7b12b8C2ceb"
+                }
+            }
+        }
+    ]
+}

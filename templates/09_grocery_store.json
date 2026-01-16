@@ -1,0 +1,57 @@
+{
+    "creditor": {
+        "name": "Fresh Market",
+        "phone": "+13055550009",
+        "email": "contact@freshmarket.com",
+        "address": {
+            "line1": "101 Produce Way",
+            "city": "Miami",
+            "state": "FL",
+            "postalCode": "33101",
+            "country": "US"
+        },
+        "MCC": "5411"
+    },
+    "bill": {
+        "description": "Grocery shopping at Fresh Market",
+        "order": {
+            "number": "GR-2026-009",
+            "date": "2026-01-16"
+        },
+        "amountDue": {
+            "amount": 8420,
+            "currency": "USD"
+        },
+        "tip": {
+            "allowed": false
+        },
+        "paymentTiming": "immediate"
+    },
+    "paymentMethods": [
+        {
+            "currency": "USD",
+            "amount": 8420,
+            "networks": {
+                "FedNow": {
+                    "routingNumber": "123456789",
+                    "accountNumber": "9876543210",
+                    "protectionType": "tokenized"
+                },
+                "RTP": {
+                    "routingNumber": "123456789",
+                    "accountNumber": "9876543210",
+                    "protectionType": "tokenized"
+                }
+            }
+        },
+        {
+            "currency": "USDC",
+            "amount": 84200000,
+            "networks": {
+                "Base": {
+                    "address": "0xa6d0AeFeB0427E0011003BFD8486f7b12b8C2ceb"
+                }
+            }
+        }
+    ]
+}

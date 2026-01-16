@@ -1,0 +1,12 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+
+# Virtual Environment
+venv/
+
+# Project specific generated files
+qrcode.txt
+qrcode.png
+payload.json
+wallet_keys.txt

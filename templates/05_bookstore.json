@@ -1,0 +1,45 @@
+{
+    "creditor": {
+        "name": "City Lights Books",
+        "phone": "+14155550005",
+        "email": "info@citylights.com",
+        "address": {
+            "line1": "261 Columbus Ave",
+            "city": "San Francisco",
+            "state": "CA",
+            "postalCode": "94133",
+            "country": "US"
+        },
+        "MCC": "5942"
+    },
+    "bill": {
+        "description": "Book purchase at City Lights Books",
+        "order": {
+            "number": "BK-2026-005",
+            "date": "2026-01-16"
+        },
+        "amountDue": {
+            "amount": 3200,
+            "currency": "USD"
+        },
+        "paymentTiming": "immediate"
+    },
+    "paymentMethods": [
+        {
+            "currency": "USD",
+            "amount": 3200,
+            "networks": {
+                "FedNow": {
+                    "routingNumber": "123456789",
+                    "accountNumber": "9876543210",
+                    "protectionType": "tokenized"
+                },
+                "RTP": {
+                    "routingNumber": "123456789",
+                    "accountNumber": "9876543210",
+                    "protectionType": "tokenized"
+                }
+            }
+        }
+    ]
+}

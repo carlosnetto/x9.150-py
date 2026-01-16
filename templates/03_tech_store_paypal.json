@@ -1,0 +1,64 @@
+{
+    "creditor": {
+        "name": "PayPal",
+        "phone": "+14085550003",
+        "email": "support@gadgethub.com",
+        "address": {
+            "line1": "2211 North First Street",
+            "city": "San Jose",
+            "state": "CA",
+            "postalCode": "95131",
+            "country": "US"
+        },
+        "ultimateCreditor": {
+            "name": "Gadget Hub",
+            "address": {
+                "line1": "789 Tech Plaza",
+                "city": "San Jose",
+                "state": "CA",
+                "postalCode": "95134",
+                "country": "US"
+            }
+        },
+        "MCC": "5732"
+    },
+    "bill": {
+        "description": "Electronics purchase at Gadget Hub",
+        "order": {
+            "number": "GH-2026-003",
+            "date": "2026-01-16"
+        },
+        "amountDue": {
+            "amount": 45000,
+            "currency": "USD"
+        },
+        "paymentTiming": "immediate"
+    },
+    "paymentMethods": [
+        {
+            "currency": "USD",
+            "amount": 45000,
+            "networks": {
+                "FedNow": {
+                    "routingNumber": "123456789",
+                    "accountNumber": "9876543210",
+                    "protectionType": "tokenized"
+                },
+                "RTP": {
+                    "routingNumber": "123456789",
+                    "accountNumber": "9876543210",
+                    "protectionType": "tokenized"
+                }
+            }
+        },
+        {
+            "currency": "USDC",
+            "amount": 450000000,
+            "networks": {
+                "Base": {
+                    "address": "0xa6d0AeFeB0427E0011003BFD8486f7b12b8C2ceb"
+                }
+            }
+        }
+    ]
+}

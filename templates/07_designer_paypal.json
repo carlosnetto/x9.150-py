@@ -1,0 +1,60 @@
+{
+    "merchantName": "PayPal",
+    "ultimateCreditor": {
+        "name": "Creative Studio",
+        "address": {
+            "city": "Austin",
+            "country": "US"
+        }
+    },
+    "mcc": "7333",
+    "merchantPhone": "+15125550007",
+    "merchantEmail": "billing@creativestudio.com",
+    "merchantAddress": {
+        "city": "Austin",
+        "country": "US"
+    },
+    "bill": {
+        "description": "Design services from Creative Studio",
+        "order": {
+            "number": "CS-2026-007",
+            "date": "2026-01-16"
+        }
+    },
+    "amount": 150000,
+    "currency": "USD",
+    "tipAllowed": false,
+    "paymentTiming": "immediate",
+    "paymentMethods": [
+        {
+            "currency": "USD",
+            "amount": 150000,
+            "network": {
+                "FedNow": {
+                    "routingNumber": "123456789",
+                    "accountNumber": "9876543210",
+                    "protectionType": "tokenized"
+                },
+                "RTP": {
+                    "routingNumber": "123456789",
+                    "accountNumber": "9876543210",
+                    "protectionType": "tokenized"
+                },
+                "ACH": {
+                    "routingNumber": "123456789",
+                    "accountNumber": "9876543210",
+                    "protectionType": "tokenized"
+                }
+            }
+        },
+        {
+            "currency": "USDC",
+            "amount": 1500000000,
+            "network": {
+                "base": {
+                    "address": "0xa6d0AeFeB0427E0011003BFD8486f7b12b8C2ceb"
+                }
+            }
+        }
+    ]
+}

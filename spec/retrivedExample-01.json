@@ -1,0 +1,144 @@
+{
+    "id": "123e4567e89b12d3a456426614174000",
+    "revision": 0,
+    "qrCodeContent": "Base64EncodedContent",
+    "createdAt": "2024-04-30T12:00:00Z",
+    "revisedAt": "2024-04-30T12:00:00Z",
+    "sentAt": "2024-05-01T21:30:00Z",
+    "validUntil": "2024-05-25T23:59:59Z",
+    "status": "active",
+    "paymentNotification": "https://payee-psp.org/notify/123e4567-e89b-12d3-a456-426614174000",
+    "creditor": {
+        "name": "California Electric Company",
+        "phone": "+15552223333",
+        "email": "billing@californiaelectric.com",
+        "address": {
+            "line1": "500 Energy Ave",
+            "line2": "Building 17, Suite 1701",
+            "city": "Los Angeles",
+            "state": "CA",
+            "postalCode": "90012",
+            "country": "US"
+        },
+        "ultimateCreditor": {
+            "account": {
+                "id": "identifiation within the the ultimate creditor system, like virtualAccount, e-mail, number, handle, etc.",
+                "schemaName": "Schema for the id - naming convention adopted from ISO20022"
+            },
+            "name": "California Electric Company - Palo Alto",
+            "phone": "+15552223333",
+            "email": "billing@paloalto.californiaelectric.com",
+            "address": {
+                "line1": "One Universisty Avenue",
+                "line2": "Building 2",
+                "city": "Palo Alto",
+                "state": "CA",
+                "postalCode": "94301",
+                "country": "US"
+            }
+        },
+        "MCC": "4900"
+    },
+    "bill": {
+        "description": "Electricity service for April 2024",
+        "order": {
+            "number": "order number containing any printable ASCII",
+            "date": "2024-04-30"
+        },
+        "invoice": {
+            "number": "INV-2024-05-00123",
+            "date": "2024-04-30",
+            "dueDate": "2024-05-15T23:59:59Z",
+            "invoicee": {
+                "name": "John Doe",
+                "phone": "+15559876543",
+                "email": "johndoe@email.com",
+                "address": {
+                    "line1": "123 Elm St",
+                    "line2": "Apt 4B",
+                    "city": "Los Angeles",
+                    "state": "CA",
+                    "postalCode": "90012",
+                    "country": "US"
+                }
+            }
+        },
+        "amountDue": {
+            "amount": 19825,
+            "currency": "USD",
+            "adjustments": [
+                {
+                    "explanation": "5% discount applied for early payment before May 10, 2024.",
+                    "amount": -991,
+                    "validUntil": "2024-05-10T23:59:59Z"
+                }
+            ]
+        },
+        "tip": {
+            "allowed": true,
+            "range": {
+                "min": 0,
+                "max": 30
+            },
+            "presets": [
+                0,
+                10,
+                15,
+                18,
+                20,
+                22
+            ]
+        }
+    },
+    "unstructured": "Account: 987650001, Meter: MTR45567",
+    "additionalInformation": [
+        {
+            "key": "CustomerServiceRef",
+            "value": "CSREF-77283"
+        },
+        {
+            "key": "PreviousBalance",
+            "value": "25.50"
+        }
+    ],
+    "paymentMethods": [
+        {
+            "currency": "USD",
+            "validUntil": "2024-05-10T23:59:59Z",
+            "amount": 18834,
+            "editable": {
+                "payerCanEdit": true,
+                "range": {
+                    "min": 10000,
+                    "max": 18834
+                }
+            },
+            "networks": {
+                "FedNow": {
+                    "routingNumber": "021000021",
+                    "accountNumber": "1234567890",
+                    "protectionType": "tokenized"
+                },
+                "RTP": {
+                    "routingNumber": "021000021",
+                    "accountNumber": "1234567890",
+                    "protectionType": "tokenized"
+                },
+                "ACH": {
+                    "routingNumber": "021000021",
+                    "accountNumber": "1234567890",
+                    "protectionType": "tokenized"
+                }
+            }
+        },
+        {
+            "currency": "USDC",
+            "amount": 188340000,
+            "networks": {
+                "Base": {
+                    "address": "0xa6d0AeFeB0427E0011003BFD8486f7b12b8C2ceb"
+                }
+            }
+        }
+    ]
+}

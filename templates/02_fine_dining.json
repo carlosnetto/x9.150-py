@@ -1,0 +1,81 @@
+{
+    "creditor": {
+        "name": "The Golden Fork",
+        "phone": "+14155550002",
+        "email": "reservations@goldenfork.com",
+        "address": {
+            "line1": "456 Elegant Way",
+            "city": "New York",
+            "state": "NY",
+            "postalCode": "10001",
+            "country": "US"
+        },
+        "MCC": "5812"
+    },
+    "bill": {
+        "description": "Fine dining experience at The Golden Fork",
+        "order": {
+            "number": "FD-2026-002",
+            "date": "2026-01-16"
+        },
+        "amountDue": {
+            "amount": 12500,
+            "currency": "USD"
+        },
+        "tip": {
+            "allowed": true,
+            "range": {
+                "min": 0,
+                "max": 35
+            },
+            "presets": [
+                18,
+                22,
+                25,
+                30
+            ]
+        },
+        "paymentTiming": "immediate"
+    },
+    "additionalInformation": [
+        {
+            "key": "Wagyu Steak",
+            "value": "85.00"
+        },
+        {
+            "key": "Vintage Bordeaux",
+            "value": "25.00"
+        },
+        {
+            "key": "Truffle Risotto",
+            "value": "15.00"
+        }
+    ],
+    "paymentMethods": [
+        {
+            "currency": "USD",
+            "amount": 12500,
+            "networks": {
+                "FedNow": {
+                    "routingNumber": "123456789",
+                    "accountNumber": "9876543210",
+                    "protectionType": "tokenized"
+                },
+                "RTP": {
+                    "routingNumber": "123456789",
+                    "accountNumber": "9876543210",
+                    "protectionType": "tokenized"
+                }
+            }
+        },
+        {
+            "currency": "USDC",
+            "amount": 125000000,
+            "networks": {
+                "Base": {
+                    "address": "0xa6d0AeFeB0427E0011003BFD8486f7b12b8C2ceb"
+                }
+            }
+        }
+    ]
+}

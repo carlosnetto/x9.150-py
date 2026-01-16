@@ -1,0 +1,64 @@
+{
+    "creditor": {
+        "name": "Brew & Bean Coffee",
+        "phone": "+14155550001",
+        "email": "orders@brewandbean.com",
+        "address": {
+            "line1": "123 Market St",
+            "city": "San Francisco",
+            "state": "CA",
+            "postalCode": "94105",
+            "country": "US"
+        },
+        "MCC": "5812"
+    },
+    "bill": {
+        "description": "Coffee and pastry at Brew & Bean Coffee",
+        "order": {
+            "number": "COF-2026-001",
+            "date": "2026-01-16"
+        },
+        "amountDue": {
+            "amount": 550,
+            "currency": "USD"
+        },
+        "paymentTiming": "immediate"
+    },
+    "additionalInformation": [
+        {
+            "key": "Espresso",
+            "value": "3.00"
+        },
+        {
+            "key": "Blueberry Muffin",
+            "value": "2.50"
+        }
+    ],
+    "paymentMethods": [
+        {
+            "currency": "USD",
+            "amount": 550,
+            "networks": {
+                "FedNow": {
+                    "routingNumber": "123456789",
+                    "accountNumber": "9876543210",
+                    "protectionType": "tokenized"
+                },
+                "RTP": {
+                    "routingNumber": "123456789",
+                    "accountNumber": "9876543210",
+                    "protectionType": "tokenized"
+                }
+            }
+        },
+        {
+            "currency": "USDC",
+            "amount": 5500000,
+            "networks": {
+                "Base": {
+                    "address": "0xa6d0AeFeB0427E0011003BFD8486f7b12b8C2ceb"
+                }
+            }
+        }
+    ]
+}

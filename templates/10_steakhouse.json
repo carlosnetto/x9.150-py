@@ -1,0 +1,80 @@
+{
+    "creditor": {
+        "name": "Prime Cut Steakhouse",
+        "phone": "+17025550010",
+        "email": "info@primecut.com",
+        "address": {
+            "line1": "555 Grill Ave",
+            "city": "Las Vegas",
+            "state": "NV",
+            "postalCode": "89101",
+            "country": "US"
+        },
+        "MCC": "5812"
+    },
+    "bill": {
+        "description": "Dinner at Prime Cut Steakhouse",
+        "order": {
+            "number": "STK-2026-010",
+            "date": "2026-01-16"
+        },
+        "amountDue": {
+            "amount": 21000,
+            "currency": "USD"
+        },
+        "tip": {
+            "range": {
+                "min": "0%",
+                "max": "30%"
+            },
+            "presets": [
+                "18%",
+                "20%",
+                "25%",
+                "30%"
+            ]
+        },
+        "paymentTiming": "immediate"
+    },
+    "additionalInformation": [
+        {
+            "key": "Ribeye Steak",
+            "value": "140.00"
+        },
+        {
+            "key": "Mashed Potatoes",
+            "value": "30.00"
+        },
+        {
+            "key": "Red Wine",
+            "value": "40.00"
+        }
+    ],
+    "paymentMethods": [
+        {
+            "currency": "USD",
+            "amount": 21000,
+            "networks": {
+                "FedNow": {
+                    "routingNumber": "123456789",
+                    "accountNumber": "9876543210",
+                    "protectionType": "tokenized"
+                },
+                "RTP": {
+                    "routingNumber": "123456789",
+                    "accountNumber": "9876543210",
+                    "protectionType": "tokenized"
+                }
+            }
+        },
+        {
+            "currency": "USDC",
+            "amount": 210000000,
+            "networks": {
+                "Base": {
+                    "address": "0xa6d0AeFeB0427E0011003BFD8486f7b12b8C2ceb"
+                }
+            }
+        }
+    ]
+}

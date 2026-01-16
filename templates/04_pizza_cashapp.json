@@ -1,0 +1,91 @@
+{
+    "creditor": {
+        "name": "CashApp",
+        "phone": "+13125550004",
+        "email": "tony@tonyspizza.com",
+        "address": {
+            "line1": "1955 Broadway",
+            "city": "Oakland",
+            "state": "CA",
+            "postalCode": "94612",
+            "country": "US"
+        },
+        "ultimateCreditor": {
+            "name": "Tony's Pizza",
+            "address": {
+                "line1": "321 Deep Dish Ln",
+                "city": "Chicago",
+                "state": "IL",
+                "postalCode": "60601",
+                "country": "US"
+            }
+        },
+        "MCC": "5812"
+    },
+    "bill": {
+        "description": "Pizza order from Tony's Pizza",
+        "order": {
+            "number": "PIZ-2026-004",
+            "date": "2026-01-16"
+        },
+        "amountDue": {
+            "amount": 2450,
+            "currency": "USD"
+        },
+        "tip": {
+            "allowed": true,
+            "range": {
+                "min": 0,
+                "max": 28
+            },
+            "presets": [
+                15,
+                18,
+                20,
+                25
+            ]
+        },
+        "paymentTiming": "immediate"
+    },
+    "additionalInformation": [
+        {
+            "key": "Pepperoni Pizza",
+            "value": "18.00"
+        },
+        {
+            "key": "Garlic Knots",
+            "value": "4.00"
+        },
+        {
+            "key": "Diet Coke",
+            "value": "2.50"
+        }
+    ],
+    "paymentMethods": [
+        {
+            "currency": "USD",
+            "amount": 2450,
+            "networks": {
+                "FedNow": {
+                    "routingNumber": "123456789",
+                    "accountNumber": "9876543210",
+                    "protectionType": "tokenized"
+                },
+                "RTP": {
+                    "routingNumber": "123456789",
+                    "accountNumber": "9876543210",
+                    "protectionType": "tokenized"
+                }
+            }
+        },
+        {
+            "currency": "USDC",
+            "amount": 24500000,
+            "networks": {
+                "Base": {
+                    "address": "0xa6d0AeFeB0427E0011003BFD8486f7b12b8C2ceb"
+                }
+            }
+        }
+    ]
+}

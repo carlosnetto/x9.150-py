@@ -1,0 +1,6 @@
+flask
+qrcode[pil]
+python-jose
+cryptography
+requests
+web3

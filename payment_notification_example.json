@@ -1,0 +1,14 @@
+{
+    "id": "123e4567e89B12d3a456426614174000",
+    "payment": {
+        "amount": 19825,
+        "tipAmount": 1000,
+        "currency": "USD",
+        "network": "FEDNOW",
+        "transactionId": "XYZ.USBK.X9aTf72qLm.1"
+    },
+    "payer": {
+        "info": "JaneDoe@Gmail.com"
+    },
+    "expectedDate": "2025-09-30T18:04:00Z"
+}

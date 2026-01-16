@@ -1,0 +1,91 @@
+{
+    "creditor": {
+        "name": "CashApp",
+        "phone": "+12065550008",
+        "email": "sushi@sakura.com",
+        "address": {
+            "line1": "1955 Broadway",
+            "city": "Oakland",
+            "state": "CA",
+            "postalCode": "94612",
+            "country": "US"
+        },
+        "ultimateCreditor": {
+            "name": "Sakura Sushi",
+            "address": {
+                "line1": "555 Zen Garden",
+                "city": "Seattle",
+                "state": "WA",
+                "postalCode": "98101",
+                "country": "US"
+            }
+        },
+        "MCC": "5812"
+    },
+    "bill": {
+        "description": "Sushi dinner at Sakura Sushi",
+        "order": {
+            "number": "SUS-2026-008",
+            "date": "2026-01-16"
+        },
+        "amountDue": {
+            "amount": 6800,
+            "currency": "USD"
+        },
+        "tip": {
+            "allowed": true,
+            "range": {
+                "min": 0,
+                "max": 32
+            },
+            "presets": [
+                18,
+                20,
+                25,
+                28
+            ]
+        },
+        "paymentTiming": "immediate"
+    },
+    "additionalInformation": [
+        {
+            "key": "Salmon Nigiri",
+            "value": "45.00"
+        },
+        {
+            "key": "Miso Soup",
+            "value": "15.00"
+        },
+        {
+            "key": "Green Tea",
+            "value": "8.00"
+        }
+    ],
+    "paymentMethods": [
+        {
+            "currency": "USD",
+            "amount": 6800,
+            "networks": {
+                "FedNow": {
+                    "routingNumber": "123456789",
+                    "accountNumber": "9876543210",
+                    "protectionType": "tokenized"
+                },
+                "RTP": {
+                    "routingNumber": "123456789",
+                    "accountNumber": "9876543210",
+                    "protectionType": "tokenized"
+                }
+            }
+        },
+        {
+            "currency": "USDC",
+            "amount": 68000000,
+            "networks": {
+                "Base": {
+                    "address": "0xa6d0AeFeB0427E0011003BFD8486f7b12b8C2ceb"
+                }
+            }
+        }
+    ]
+}

@@ -1,0 +1,90 @@
+{
+    "creditor": {
+        "name": "California Power & Light",
+        "phone": "+18005554321",
+        "email": "billing@capowerlight.com",
+        "address": {
+            "line1": "100 Energy Way",
+            "city": "Sacramento",
+            "state": "CA",
+            "postalCode": "95814",
+            "country": "US"
+        },
+        "MCC": "4900"
+    },
+    "bill": {
+        "description": "Electricity service for January 2026",
+        "invoice": {
+            "number": "INV-2026-01-99887",
+            "dueDate": "2026-02-15T23:59:59Z",
+            "invoicee": {
+                "name": "Jane Smith",
+                "phone": "+19165558899",
+                "email": "janesmith@example.com",
+                "address": {
+                    "line1": "456 Oak Lane",
+                    "city": "Sacramento",
+                    "state": "CA",
+                    "postalCode": "95816",
+                    "country": "US"
+                }
+            }
+        },
+        "amountDue": {
+            "amount": 15500,
+            "currency": "USD",
+            "adjustments": [
+                {
+                    "explanation": "10% fee for late payment",
+                    "amount": 1550
+                }
+            ]
+        },
+        "tip": {
+            "allowed": false
+        },
+        "paymentTiming": "deferred"
+    },
+    "additionalInformation": [
+        {
+            "key": "MeterNumber",
+            "value": "MTR-99001122"
+        },
+        {
+            "key": "PowerConsumption",
+            "value": "450 kWh"
+        }
+    ],
+    "paymentMethods": [
+        {
+            "currency": "USD",
+            "amount": 15500,
+            "networks": {
+                "FedNow": {
+                    "routingNumber": "123456789",
+                    "accountNumber": "9876543210",
+                    "protectionType": "tokenized"
+                },
+                "RTP": {
+                    "routingNumber": "123456789",
+                    "accountNumber": "9876543210",
+                    "protectionType": "tokenized"
+                },
+                "ACH": {
+                    "routingNumber": "123456789",
+                    "accountNumber": "9876543210",
+                    "protectionType": "tokenized"
+                }
+            }
+        },
+        {
+            "currency": "USDC",
+            "amount": 155000000,
+            "networks": {
+                "Base": {
+                    "address": "0xa6d0AeFeB0427E0011003BFD8486f7b12b8C2ceb"
+                }
+            }
+        }
+    ]
+}

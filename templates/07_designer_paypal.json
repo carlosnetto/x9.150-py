@@ -1,35 +1,51 @@
 {
-    "merchantName": "PayPal",
-    "ultimateCreditor": {
-        "name": "Creative Studio",
+    "creditor": {
+        "name": "PayPal",
+        "phone": "+15125550007",
+        "email": "billing@creativestudio.com",
         "address": {
-            "city": "Austin",
+            "line1": "2211 North First Street",
+            "city": "San Jose",
+            "state": "CA",
+            "postalCode": "95131",
             "country": "US"
-        }
-    },
-    "mcc": "7333",
-    "merchantPhone": "+15125550007",
-    "merchantEmail": "billing@creativestudio.com",
-    "merchantAddress": {
-        "city": "Austin",
-        "country": "US"
+        },
+        "ultimateCreditor": {
+            "account": {
+                "id": "billing@creativestudio.com",
+                "schemaName": "email"
+            },
+            "name": "Creative Studio",
+            "address": {
+                "line1": "101 Design Way",
+                "city": "Austin",
+                "state": "TX",
+                "postalCode": "78701",
+                "country": "US"
+            }
+        },
+        "MCC": "7333"
     },
     "bill": {
         "description": "Design services from Creative Studio",
         "order": {
             "number": "CS-2026-007",
             "date": "2026-01-16"
-        }
+        },
+        "amountDue": {
+            "amount": 150000,
+            "currency": "USD"
+        },
+        "tip": {
+            "allowed": false
+        },
+        "paymentTiming": "immediate"
     },
-    "amount": 150000,
-    "currency": "USD",
-    "tipAllowed": false,
-    "paymentTiming": "immediate",
     "paymentMethods": [
         {
             "currency": "USD",
             "amount": 150000,
-            "network": {
+            "networks": {
                 "FedNow": {
                     "routingNumber": "123456789",
                     "accountNumber": "9876543210",
@@ -50,8 +66,8 @@
         {
             "currency": "USDC",
             "amount": 1500000000,
-            "network": {
-                "base": {
+            "networks": {
+                "Base": {
                     "address": "0xa6d0AeFeB0427E0011003BFD8486f7b12b8C2ceb"
                 }
             }

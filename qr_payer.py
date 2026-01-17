@@ -5,6 +5,7 @@ import requests
 from datetime import datetime, timezone
 from jose import jws
 from cryptography.hazmat.primitives import serialization
+from cryptography import x509
 from cryptography.hazmat.primitives.asymmetric import ec
 from web3 import Web3
 from eth_account import Account
@@ -42,15 +43,27 @@ def extract_fetch_url(emv_str):
         url = "http://" + url
     return url
 
-def generate_temp_keys():
-    """Generates a temporary ECC key pair for signing the request."""
-    private_key = ec.generate_private_key(ec.SECP256R1())
-    private_pem = private_key.private_bytes(
-        encoding=serialization.Encoding.PEM,
-        format=serialization.PrivateFormat.PKCS8,
-        encryption_algorithm=serialization.NoEncryption()
-    )
-    return private_pem
+def load_payer_identity():
+    """Loads the persistent Payer keys and prepares the x5c header."""
+    try:
+        with open("payer_key.txt", "rb") as f:
+            private_pem = f.read()
+        
+        with open("payer_cert.pem", "rb") as f:
+            cert_data = f.read()
+            cert = x509.load_pem_x509_certificate(cert_data)
+            # x5c requires DER format, then standard Base64 encoding
+            cert_b64 = base64.b64encode(cert.public_bytes(serialization.Encoding.DER)).decode('utf-8')
+            
+        # Load x5u from JWKS to include in our own headers
+        with open("payer.jwks", "r") as f:
+            jwks = json.load(f)
+            x5u = jwks["keys"][0].get("x5u")
+            
+        return private_pem, cert_b64, x5u
+    except FileNotFoundError:
+        print("[!] Error: Payer keys/certs not found. Run keygen.py first.")
+        return None, None, None
 
 def display_payload(payload):
     """Prints the X9.150 payload in a human-readable format."""
@@ -221,6 +234,21 @@ def pay_usdc_on_base(mnemonic, recipient_address):
         print(f"[!] Blockchain transaction failed: {e}")
         return None, None
 
+def verify_jws(token):
+    """Verifies a JWS using x5c (embedded) or x5u (remote via certserv)."""
+    header = jws.get_unverified_header(token)
+    # 1. Try x5c (Embedded - High Performance)
+    if 'x5c' in header:
+        cert_der = base64.b64decode(header['x5c'][0])
+        cert = x509.load_der_x509_certificate(cert_der)
+        return jws.verify(token, cert.public_key(), algorithms=['ES256'])
+    # 2. Try x5u (URL - uses certserv.py)
+    if 'x5u' in header:
+        r = requests.get(header['x5u'])
+        cert = x509.load_pem_x509_certificate(r.content)
+        return jws.verify(token, cert.public_key(), algorithms=['ES256'])
+    raise ValueError("No certificate found in JWS headers")
+
 def run_payer():
     # 1. Read the QR code content (simulating a scan)
     if not os.path.exists(QR_TEXT_FILE):
@@ -248,13 +276,18 @@ def run_payer():
     }
 
     # 4. Generate keys and sign as JWS
-    print("[*] Generating temporary keys and signing request...")
-    private_key_pem = generate_temp_keys()
+    print("[*] Loading Payer identity and signing request...")
+    private_key_pem, payer_cert_b64, payer_x5u = load_payer_identity()
+    if not private_key_pem:
+        return
     
     # Standard JWS headers for X9.150
     headers = {
         "alg": "ES256",
-        "typ": "payreq+jws"
+        "typ": "payreq+jws",
+        "x5c": [payer_cert_b64],
+        "x5u": payer_x5u,
+        "kid": "payer-key-id-001"
     }
     
     signed_jws = jws.sign(payload, private_key_pem, headers=headers, algorithm='ES256')
@@ -271,9 +304,8 @@ def run_payer():
         print(f"[*] Server Response Status: {response.status_code}")
         
         if response.status_code == 200:
-            # Extract payload from JWS (unverified for display purposes in this POC step)
-            payload_bytes = jws.get_unverified_claims(response.text)
-            payload_json = json.loads(payload_bytes.decode('utf-8'))
+            # Verify the server's signature (uses x5c or certserv via x5u)
+            payload_json = json.loads(verify_jws(response.text).decode('utf-8'))
             display_payload(payload_json)
             
             # --- Blockchain Payment Step ---
@@ -306,19 +338,21 @@ def run_payer():
                                 # transactionId omitted for initiation
                             },
                             "payer": {
-                                "info": payer_addr
+                                "info": payer_addr,
+                                "fromAddress": payer_addr
                             },
                             "expectedDate": datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
                         }
 
-                        notif_headers = {"alg": "ES256", "typ": "payreq+jws"}
-                        signed_init_notification = jws.sign(notification_payload, private_key_pem, headers=notif_headers, algorithm='ES256')
+                        signed_init_notification = jws.sign(notification_payload, private_key_pem, headers=headers, algorithm='ES256')
                         
                         notify_url = payload_json.get("paymentNotification")
                         init_resp = requests.post(notify_url, data=signed_init_notification, headers={'Content-Type': 'application/jose'})
 
                         if init_resp.status_code == 200:
-                            print("[*] Payee will accept the payment and the qr code is locked to avoid duplicated payment.")
+                            init_resp_data = json.loads(verify_jws(init_resp.text).decode('utf-8'))
+                            if init_resp_data.get("statusCode") == 200:
+                                print("[*] Payee will accept the payment and the qr code is locked to avoid duplicated payment.")
                             
                             # --- Step 2: Send funds via Base ---
                             tx_hash, _ = pay_usdc_on_base(mnemonic, usdc_base_address)
@@ -328,8 +362,12 @@ def run_payer():
                                 print("[*] making the final notification to the payee informing the txHash related to the payment.")
                                 notification_payload["payment"]["transactionId"] = tx_hash
                                 
-                                signed_final_notification = jws.sign(notification_payload, private_key_pem, headers=notif_headers, algorithm='ES256')
-                                requests.post(notify_url, data=signed_final_notification, headers={'Content-Type': 'application/jose'})
+                                signed_final_notification = jws.sign(notification_payload, private_key_pem, headers=headers, algorithm='ES256')
+                                final_resp = requests.post(notify_url, data=signed_final_notification, headers={'Content-Type': 'application/jose'})
+                                if final_resp.status_code == 200:
+                                    final_resp_data = json.loads(verify_jws(final_resp.text).decode('utf-8'))
+                                    if final_resp_data.get("statusCode") == 200:
+                                        print("[*] Final confirmation received and verified.")
                             else:
                                 print("[!] Payment failed on-chain. Final notification skipped.")
                         else:

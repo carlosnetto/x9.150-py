@@ -24,8 +24,8 @@ pip install -r requirements.txt
 
 ## Usage
 
-### 1. Generate QR Code & Keys
-Run the generator script to create the keys, payment payload, and QR code image. This will also save session data to `x9_data.json`.
+### 1. Generate QR Code & Payload
+Run the generator script with a biller template to create the payment payload, raw QR string, and QR code image.
 
 ```bash
 python qr_generator.py templates/01_coffee_shop.json

@@ -1,0 +1,15 @@
+{
+    "keys": [
+        {
+            "kty": "EC",
+            "crv": "P-256",
+            "x": "ofgruOSwUwVoJHEtoe6jYoo07R3O-SZjnM1RrbJU77s",
+            "y": "DY4wIX83WWselUF18nwwIROR_sOak9_G-1aAfHaNILM",
+            "use": "sig",
+            "kid": "payee-key-id-001",
+            "x5u": "http://127.0.0.1:5001/payee_cert.pem",
+            "x5t#S256": "NJIwqZEhQRLILV0F4Ug3mtWANQiryZJpjnRswh-1lgI",
+            "alg": "ES256"
+        }
+    ]
+}

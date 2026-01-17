@@ -9,10 +9,12 @@ This repository contains a **Proof of Concept (POC)** and testing implementation
 *   **EMVCo Compliance**: Generates QR content strings adhering to EMVCo Merchant Presented Mode specifications (Section 5.2.2).
 *   **X9.150 Payload**: Constructs the JSON Payment Payload with required fields (Section 6.2).
 *   **Security (JWS)** (Section 7):
-    *   Signs outgoing Payment Payloads using `ES256`.
-    *   Verifies incoming Payment Notifications using `ES256`.
+    *   Signs outgoing payloads and notifications using `ES256`.
+    *   Supports **Hybrid Verification**: Uses `x5c` (embedded certificate) for performance and `x5u` (URL-based) for standard-compliant certificate retrieval.
 *   **Explicit Routing**: Uses dedicated paths for payload retrieval (`/fetch/`) and notifications (`/notify/`) instead of a single broker endpoint.
 *   **Tunneling Support**: Easily integrates with tunneling services like `pinggy.io` for external device testing.
+*   **Certificate Server**: Includes a dedicated service to host public keys and JWKS metadata.
+*   **Blockchain Integration**: Payer simulation supports USDC payments on the Base network.
 
 ## Prerequisites
 
@@ -24,7 +26,21 @@ pip install -r requirements.txt
 
 ## Usage
 
-### 1. Generate QR Code & Payload
+### 1. Generate Keys and Certificates
+First, generate the necessary ECC key pairs, self-signed certificates, and JWKS metadata for both the Payer and Payee.
+
+```bash
+python keygen.py
+```
+
+### 2. Start the Certificate Server
+Run the certificate server to host the public certificates. This allows the JWS `x5u` header to function correctly during verification.
+
+```bash
+python certserv.py
+```
+
+### 3. Generate QR Code & Payload
 Run the generator script with a biller template to create the payment payload, raw QR string, and QR code image.
 
 ```bash

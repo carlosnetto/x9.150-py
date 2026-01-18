@@ -37,6 +37,8 @@ jwk_metadata = {}
 FAIL_SIGNATURE = False
 FAIL_CORRELATION_ID = False
 FAIL_JWS_CUSTOM = False
+FAIL_IAT = False
+FAIL_TTL = False
 
 def validate_against_spec(data, schema_name):
     """Validates JSON against the OpenAPI spec. Required for spec validation testing."""
@@ -123,8 +125,14 @@ def load_data():
 def sign_jws(payload, key_pem, correlation_id=None, is_fetch=False):
     """Wraps the payload in a JWS structure (used for responses)."""
     iat = int(time.time())
+    if FAIL_IAT:
+        print("[!] Testing Mode: Intentionally returning an iat from 11 minutes ago.")
+        iat -= 660 # 11 minutes ago
 
     ttl_val = (iat * 1000) + 60000 # 1 minute after iat
+    if FAIL_TTL:
+        print("[!] Testing Mode: Intentionally returning an expired ttl.")
+        ttl_val = (int(time.time()) * 1000) - 1000 # 1 second ago
     
     effective_correlation_id = correlation_id or str(uuid.uuid4())
 
@@ -202,7 +210,7 @@ def validate_jws_headers(header):
     if iat:
         if iat > now + 60: # 1 minute clock skew allowance
             return False, "iat is in the future."
-        if now - iat > 300: # 5 minutes threshold
+        if now - iat > 480: # 8 minutes threshold
             return False, f"iat is too old ({now - iat} seconds ago)."
     
     # 3. Validate ttl (Time To Live)
@@ -329,11 +337,15 @@ if __name__ == "__main__":
     parser.add_argument("--failSignature", action="store_true", help="Intentionally corrupt the JWS signature for testing.")
     parser.add_argument("--failCorrelationId", action="store_true", help="Intentionally return a wrong correlationId in the /fetch response.")
     parser.add_argument("--failjwscustom", action="store_true", help="Intentionally omit mandatory JWS headers (iat, ttl, correlationId) randomly in responses.")
+    parser.add_argument("--failiat", action="store_true", help="Intentionally return an iat from 11 minutes ago.")
+    parser.add_argument("--failttl", action="store_true", help="Intentionally return an expired ttl.")
     args = parser.parse_args()
 
     FAIL_SIGNATURE = args.failSignature
     FAIL_CORRELATION_ID = args.failCorrelationId
     FAIL_JWS_CUSTOM = args.failjwscustom
+    FAIL_IAT = args.failiat
+    FAIL_TTL = args.failttl
 
     if load_data():
         print(f"[*] Starting Payee Server at http://{HOST}:{PORT}...")

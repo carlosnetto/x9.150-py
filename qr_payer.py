@@ -331,7 +331,7 @@ def validate_jws_headers(header, expected_correlation_id=None):
         if iat > now + 60: # 1 minute clock skew allowance
             print("[!] Security Error: iat is in the future!")
             return False
-        if now - iat > 300: # 5 minutes threshold
+        if now - iat > 480: # 8 minutes threshold
             print(f"[!] Security Error: iat is too old ({now - iat} seconds ago)!")
             return False
     
@@ -386,7 +386,7 @@ def log_server_error(resp):
             pass
     print(content)
 
-def run_payer(fail_sig=False, fail_jws_custom=False):
+def run_payer(fail_sig=False, fail_jws_custom=False, fail_iat=False, fail_ttl=False):
     global FAIL_SIGNATURE
     FAIL_SIGNATURE = fail_sig
     global FAIL_JWS_CUSTOM
@@ -426,7 +426,14 @@ def run_payer(fail_sig=False, fail_jws_custom=False):
         return
     
     iat = int(time.time())
+    if fail_iat:
+        print("[!] Testing Mode: Intentionally sending an iat from 11 minutes ago.")
+        iat -= 660
+
     ttl = (iat * 1000) + 60000  # 1 minute TTL in milliseconds
+    if fail_ttl:
+        print("[!] Testing Mode: Intentionally sending an expired ttl.")
+        ttl = (int(time.time()) * 1000) - 1000
 
     # Standard JWS headers for X9.150
     headers = {
@@ -585,6 +592,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="X9.150 Payer PSP Simulator")
     parser.add_argument("--failSignature", action="store_true", help="Intentionally corrupt the JWS signature for testing.")
     parser.add_argument("--failjwscustom", action="store_true", help="Intentionally omit mandatory JWS headers (iat, ttl, correlationId) randomly.")
+    parser.add_argument("--failiat", action="store_true", help="Intentionally send an iat from 11 minutes ago.")
+    parser.add_argument("--failttl", action="store_true", help="Intentionally send an expired ttl.")
     args = parser.parse_args()
 
-    run_payer(fail_sig=args.failSignature, fail_jws_custom=args.failjwscustom)
+    run_payer(fail_sig=args.failSignature, fail_jws_custom=args.failjwscustom, fail_iat=args.failiat, fail_ttl=args.failttl)

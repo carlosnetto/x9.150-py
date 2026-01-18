@@ -23,6 +23,7 @@
         "MCC": "5732"
     },
     "bill": {
+        "paymentTiming": "immediate",
         "description": "Electronics purchase at Gadget Hub",
         "order": {
             "number": "GH-2026-003",
@@ -31,8 +32,7 @@
         "amountDue": {
             "amount": 45000,
             "currency": "USD"
-        },
-        "paymentTiming": "immediate"
+        }
     },
     "paymentMethods": [
         {

@@ -13,6 +13,7 @@
         "MCC": "5411"
     },
     "bill": {
+        "paymentTiming": "immediate",
         "description": "Grocery shopping at Fresh Market",
         "order": {
             "number": "GR-2026-009",
@@ -24,8 +25,7 @@
         },
         "tip": {
             "allowed": false
-        },
-        "paymentTiming": "immediate"
+        }
     },
     "paymentMethods": [
         {

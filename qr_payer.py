@@ -2,6 +2,10 @@ import base64
 import json
 import os
 import requests
+import uuid
+import time
+import argparse
+import random
 from datetime import datetime, timezone
 from jose import jws
 from cryptography.hazmat.primitives import serialization
@@ -9,9 +13,13 @@ from cryptography import x509
 from cryptography.hazmat.primitives.asymmetric import ec
 from web3 import Web3
 from eth_account import Account
+import yaml
+from jsonschema import validate, RefResolver
 
 # --- CONFIGURATION ---
 QR_TEXT_FILE = "qrcode.txt"
+FAIL_SIGNATURE = False
+FAIL_JWS_CUSTOM = False
 
 def parse_emv_tlv(data):
     """Helper to parse EMV TLV format."""
@@ -25,8 +33,23 @@ def parse_emv_tlv(data):
         i += 4 + length
     return results
 
+def validate_against_spec(data, schema_name):
+    """Validates JSON against the OpenAPI spec. Required for spec validation testing."""
+    spec_path = os.path.join(os.path.dirname(__file__), "spec", "openapi.yaml")
+    if not os.path.exists(spec_path):
+        return
+    with open(spec_path, 'r') as f:
+        spec = yaml.safe_load(f)
+    schema = spec['components']['schemas'][schema_name]
+    resolver = RefResolver(f"file://{os.path.abspath(spec_path)}", spec)
+    try:
+        validate(instance=data, schema=schema, resolver=resolver)
+        print(f"[OK] JSON validated against {schema_name}")
+    except Exception as e:
+        print(f"[!] Spec Validation Error ({schema_name}): {e}")
+
 def extract_fetch_url(emv_str):
-    """Extracts the URL from Tag 26, Subtag 01."""
+    """Extracts the URL from Tag 26, Subtag 01. URLs shall adhere to RFC 3986."""
     # Top level parsing
     tags = parse_emv_tlv(emv_str)
     if "26" not in tags:
@@ -38,7 +61,9 @@ def extract_fetch_url(emv_str):
         raise ValueError("Subtag 01 (URL) not found within Tag 26.")
     
     url = subtags["01"]
-    # Add protocol if missing (EMV QR usually strips it for space)
+    # Tag 26 Subtag 01 omits the protocol and the '://' separator to save space.
+    # For testing purposes, we are using http:// instead of https:// for simplicity.
+    # NOTE: This is NOT compliant with the X9.150 spec, which assumes https://.
     if not url.startswith("http"):
         url = "http://" + url
     return url
@@ -73,6 +98,9 @@ def display_payload(payload):
     print("="*60)
     skip_keys = ["qrCodeContent", "paymentNotification", "creditor", "bill", "paymentMethods", "additionalInformation", "unstructured"]
     for k, v in payload.items():
+        # Note: If validUntil has passed, the Payer PSP should attempt to fetch the payload again.
+        # The Payee may provide a new revision with updated adjustments (like late fees) 
+        # and an extended validUntil.
         if k not in skip_keys:
             print(f"{k:25}: {v}")
 
@@ -125,10 +153,14 @@ def display_payload(payload):
         print("\n" + "="*60)
         print("ADJUSTMENTS")
         print("="*60)
-        print(f"{'EXPLANATION':45} | {'AMOUNT'}")
+        print(f"{'EXPLANATION':45} | {'AMOUNT':10} | {'VALID UNTIL'}")
         print("-" * 60)
         for adj in adjustments:
-            print(f"{adj.get('explanation', ''):45} | {adj.get('amount', '')}")
+            # Note: validUntil is the last millisecond the adjustment is valid.
+            # If the current time exceeds this, the Payer PSP must fetch the payload again
+            # to ensure adjustments (like late fees or expired discounts) are up to date.
+            valid_until = adj.get('validUntil', 'N/A')
+            print(f"{adj.get('explanation', ''):45} | {adj.get('amount', ''):10} | {valid_until}")
 
     tip = bill.get("tip", {})
     if tip.get("allowed"):
@@ -241,15 +273,59 @@ def verify_jws(token):
     if 'x5c' in header:
         cert_der = base64.b64decode(header['x5c'][0])
         cert = x509.load_der_x509_certificate(cert_der)
-        return jws.verify(token, cert.public_key(), algorithms=['ES256'])
+        payload = jws.verify(token, cert.public_key(), algorithms=['ES256'])
+        return payload, header
     # 2. Try x5u (URL - uses certserv.py)
     if 'x5u' in header:
         r = requests.get(header['x5u'])
         cert = x509.load_pem_x509_certificate(r.content)
-        return jws.verify(token, cert.public_key(), algorithms=['ES256'])
+        payload = jws.verify(token, cert.public_key(), algorithms=['ES256'])
+        return payload, header
     raise ValueError("No certificate found in JWS headers")
 
-def run_payer():
+def validate_jws_headers(header):
+    """Validates iat and ttl in JWS headers for security and spec compliance."""
+    now = int(time.time())
+    iat = header.get("iat")
+    if iat:
+        if iat > now:
+            print("[!] Security Error: iat is in the future!")
+            return False
+        if now - iat > 300: # 5 minutes threshold
+            print(f"[!] Security Error: iat is too old ({now - iat} seconds ago)!")
+            return False
+    
+    ttl = header.get("ttl")
+    if ttl:
+        now_ms = int(time.time() * 1000)
+        if now_ms > ttl:
+            print(f"[!] Security Error: JWS has expired (ttl: {ttl}, current: {now_ms})!")
+            return False
+    return True
+
+def sign_jws_with_fail_logic(payload, private_key_pem, headers):
+    """Helper to sign JWS with optional intentional signature corruption for testing."""
+    token = jws.sign(payload, private_key_pem, headers=headers, algorithm='ES256')
+    
+    if FAIL_SIGNATURE:
+        print("[!] Testing Mode: Intentionally corrupting the signature (skipping first 4 bytes of payload calculation).")
+        # We sign a version of the payload missing the first 4 bytes
+        # but we package it with the original header and payload.
+        p_str = json.dumps(payload) if isinstance(payload, dict) else payload
+        wrong_token = jws.sign(p_str[4:] if len(p_str) > 4 else p_str, private_key_pem, headers=headers, algorithm='ES256')
+        
+        parts = token.split('.')
+        wrong_parts = wrong_token.split('.')
+        return f"{parts[0]}.{parts[1]}.{wrong_parts[2]}"
+        
+    return token
+
+def run_payer(fail_sig=False, fail_jws_custom=False):
+    global FAIL_SIGNATURE
+    FAIL_SIGNATURE = fail_sig
+    global FAIL_JWS_CUSTOM
+    FAIL_JWS_CUSTOM = fail_jws_custom
+
     # 1. Read the QR code content (simulating a scan)
     if not os.path.exists(QR_TEXT_FILE):
         print(f"[!] Error: {QR_TEXT_FILE} not found. Run qr_generator.py first.")
@@ -269,11 +345,13 @@ def run_payer():
         return
 
     # 3. Create the JSON payload
+    correlation_id = str(uuid.uuid4())
     # The spec requires the qrCodeContent to be Base64URL encoded
     qr_b64url = base64.urlsafe_b64encode(qrcode_content.encode()).decode().rstrip("=")
     payload = {
         "qrCodeContent": qr_b64url
     }
+    validate_against_spec(payload, "FetchRequestPayload")
 
     # 4. Generate keys and sign as JWS
     print("[*] Loading Payer identity and signing request...")
@@ -281,15 +359,34 @@ def run_payer():
     if not private_key_pem:
         return
     
+    iat = int(time.time())
+    ttl = (iat * 1000) + 60000  # 1 minute TTL in milliseconds
+
     # Standard JWS headers for X9.150
     headers = {
         "alg": "ES256",
         "typ": "payreq+jws",
         "x5c": [payer_cert_b64],
         "x5u": payer_x5u,
-        "kid": "payer-key-id-001"
+        "kid": "payer-key-id-001",
+        "iat": iat,
+        "ttl": ttl,
+        "correlationId": correlation_id,
+        "crit": ["iat", "ttl", "correlationId"]
     }
     
+    if FAIL_JWS_CUSTOM:
+        fields = ["iat", "ttl", "correlationId"]
+        # Select a random non-empty subset to remove
+        to_remove = []
+        while not to_remove:
+            to_remove = [f for f in fields if random.choice([True, False])]
+        
+        print(f"[!] Testing Mode: Intentionally omitting JWS headers: {to_remove}")
+        for field in to_remove:
+            if field in headers:
+                del headers[field]
+
     signed_jws = jws.sign(payload, private_key_pem, headers=headers, algorithm='ES256')
 
     # 5. Call the fetch method
@@ -305,8 +402,32 @@ def run_payer():
         
         if response.status_code == 200:
             # Verify the server's signature (uses x5c or certserv via x5u)
-            payload_json = json.loads(verify_jws(response.text).decode('utf-8'))
+            payload_bytes, resp_header = verify_jws(response.text)
+            
+            # Validate security headers
+            if not validate_jws_headers(resp_header):
+                return
+
+            # Validate correlationId echo for non-repudiation
+            if resp_header.get("correlationId") != correlation_id:
+                print(f"[!] Security Error: correlationId mismatch! Expected {correlation_id}, got {resp_header.get('correlationId')}")
+                return
+
+            payload_json = json.loads(payload_bytes.decode('utf-8'))
+            validate_against_spec(payload_json, "PaymentRequest")
             display_payload(payload_json)
+
+            # Ensure the request is ACTIVE before proceeding
+            status = payload_json.get("status")
+            if status == "PAYMENT_INITIATED":
+                print("[!] Error: Somebody else has started the payment of this QR code at the same time.")
+                return
+            elif status == "PAID":
+                print("[!] Error: This QR code has already been paid.")
+                return
+            elif status != "ACTIVE":
+                print(f"[!] Error: Payment request is not ACTIVE (Current Status: {status})")
+                return
             
             # --- Blockchain Payment Step ---
             usdc_base_address = None
@@ -328,29 +449,41 @@ def run_payer():
 
                     if tx_hash:
                         # --- Step 1: Initial Payment Notification (Initiation) ---
-                        print("[*] initiating the payment")
+                        print("[*] Initiating payment (Status: PAYMENT_INITIATED)...")
                         notification_payload = {
                             "id": payload_json.get("id"),
                             "payment": {
                                 "amount": 1000000,  # 1 USDC for testing
                                 "currency": "USDC",
-                                "network": "BASE"
+                                "network": "BASE",
+                                "paymentTiming": payload_json.get("bill", {}).get("paymentTiming")
                                 # transactionId omitted for initiation
                             },
                             "payer": {
                                 "info": payer_addr,
                                 "fromAddress": payer_addr
                             },
-                            "expectedDate": datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+                            "expectedDate": datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
                         }
+                        validate_against_spec(notification_payload, "NotificationPayload")
 
-                        signed_init_notification = jws.sign(notification_payload, private_key_pem, headers=headers, algorithm='ES256')
+                        signed_init_notification = sign_jws_with_fail_logic(notification_payload, private_key_pem, headers)
                         
                         notify_url = payload_json.get("paymentNotification")
                         init_resp = requests.post(notify_url, data=signed_init_notification, headers={'Content-Type': 'application/jose'})
 
                         if init_resp.status_code == 200:
-                            init_resp_data = json.loads(verify_jws(init_resp.text).decode('utf-8'))
+                            init_payload_bytes, init_resp_header = verify_jws(init_resp.text)
+                            
+                            if not validate_jws_headers(init_resp_header):
+                                return
+
+                            if init_resp_header.get("correlationId") != correlation_id:
+                                print(f"[!] Security Error: correlationId mismatch in init notification! Expected {correlation_id}")
+                                return
+
+                            init_resp_data = json.loads(init_payload_bytes.decode('utf-8'))
+                            validate_against_spec(init_resp_data, "SignedStatusCodePayload")
                             if init_resp_data.get("statusCode") == 200:
                                 print("[*] Payee will accept the payment and the qr code is locked to avoid duplicated payment.")
                             
@@ -359,13 +492,24 @@ def run_payer():
 
                             if tx_hash:
                                 # --- Step 3: Final Payment Notification (Completion) ---
-                                print("[*] making the final notification to the payee informing the txHash related to the payment.")
+                                print("[*] Sending final notification (Status: PAID) with transaction hash...")
                                 notification_payload["payment"]["transactionId"] = tx_hash
+                                validate_against_spec(notification_payload, "NotificationPayload")
                                 
-                                signed_final_notification = jws.sign(notification_payload, private_key_pem, headers=headers, algorithm='ES256')
+                                signed_final_notification = sign_jws_with_fail_logic(notification_payload, private_key_pem, headers)
                                 final_resp = requests.post(notify_url, data=signed_final_notification, headers={'Content-Type': 'application/jose'})
                                 if final_resp.status_code == 200:
-                                    final_resp_data = json.loads(verify_jws(final_resp.text).decode('utf-8'))
+                                    final_payload_bytes, final_resp_header = verify_jws(final_resp.text)
+                                    
+                                    if not validate_jws_headers(final_resp_header):
+                                        return
+
+                                    if final_resp_header.get("correlationId") != correlation_id:
+                                        print(f"[!] Security Error: correlationId mismatch in final notification! Expected {correlation_id}")
+                                        return
+
+                                    final_resp_data = json.loads(final_payload_bytes.decode('utf-8'))
+                                    validate_against_spec(final_resp_data, "SignedStatusCodePayload")
                                     if final_resp_data.get("statusCode") == 200:
                                         print("[*] Final confirmation received and verified.")
                             else:
@@ -381,4 +525,9 @@ def run_payer():
         print(f"[!] Request failed: {e}")
 
 if __name__ == "__main__":
-    run_payer()
+    parser = argparse.ArgumentParser(description="X9.150 Payer PSP Simulator")
+    parser.add_argument("--failSignature", action="store_true", help="Intentionally corrupt the JWS signature for testing.")
+    parser.add_argument("--failjwscustom", action="store_true", help="Intentionally omit mandatory JWS headers (iat, ttl, correlationId) randomly.")
+    args = parser.parse_args()
+
+    run_payer(fail_sig=args.failSignature, fail_jws_custom=args.failjwscustom)

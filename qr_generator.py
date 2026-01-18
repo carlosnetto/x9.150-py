@@ -6,6 +6,8 @@ import argparse
 import os
 import qrcode
 from datetime import datetime, timezone, timedelta
+import yaml
+from jsonschema import validate, RefResolver
 
 # --- CONFIGURATION ---
 PORT = 5000
@@ -16,6 +18,21 @@ QR_IMAGE_FILE = "qrcode.png"
 PAYLOAD_FILE = "payload.json"
 
 # --- DATA PROCESSING ---
+def validate_against_spec(data, schema_name):
+    """Validates JSON against the OpenAPI spec. Required for spec validation testing."""
+    spec_path = os.path.join(os.path.dirname(__file__), "spec", "openapi.yaml")
+    if not os.path.exists(spec_path):
+        return
+    with open(spec_path, 'r') as f:
+        spec = yaml.safe_load(f)
+    schema = spec['components']['schemas'][schema_name]
+    resolver = RefResolver(f"file://{os.path.abspath(spec_path)}", spec)
+    try:
+        validate(instance=data, schema=schema, resolver=resolver)
+        print(f"[OK] Created JSON validated against {schema_name}")
+    except Exception as e:
+        print(f"[!] Spec Validation Error ({schema_name}): {e}")
+
 CURRENCY_TO_NUMERIC = {
     "USD": "840",
     "EUR": "978",
@@ -41,6 +58,7 @@ def calculate_crc(data_string):
 
 def format_emv_qr(url, template):
     """Constructs the EMVCo Merchant Presented Mode QR Content String."""
+    # Note: url shall adhere to the syntax dictated by RFC 3986.
     def tlv(tag, value):
         return f"{tag}{len(value):02}{value}"
 
@@ -49,7 +67,10 @@ def format_emv_qr(url, template):
     amt_due = bill.get("amountDue", {})
     address = creditor.get("address", {})
 
-    clean_url = url.replace("https://", "").replace("http://", "")
+    # Tag 26 Subtag 01 omits the protocol and the '://' separator to save space.
+    # For example, 'https://bank.com/fetch/uid' becomes 'bank.com/fetch/uid'.
+    # The standard assumes the URL starts with https://.
+    clean_url = url.split("://")[-1] if "://" in url else url
     tag_26_val = tlv("00", "org.x9") + tlv("01", clean_url)
     
     amt_decimal = f"{amt_due.get('amount', 0) / 100:.2f}"
@@ -73,8 +94,8 @@ def format_emv_qr(url, template):
 def create_payment_payload(template, qr_content_string, payload_id, base_url):
     """Merges Template with System Generated Fields."""
     now = datetime.now(timezone.utc)
-    now_str = now.strftime('%Y-%m-%dT%H:%M:%SZ')
-    valid_until = (now + timedelta(minutes=15)).strftime('%Y-%m-%dT%H:%M:%SZ')
+    now_str = now.strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
+    valid_until = (now + timedelta(minutes=15)).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
     
     qr_b64 = base64.urlsafe_b64encode(qr_content_string.encode()).decode().rstrip("=")
     
@@ -137,6 +158,9 @@ if __name__ == "__main__":
     print(f"[*] Processing template: {args.template}")
     emv_qr_string = format_emv_qr(qr_url, template_data)
     final_payload = create_payment_payload(template_data, emv_qr_string, txn_id, BASE_URL)
+
+    # Validate the created payload against the spec
+    validate_against_spec(final_payload, "PaymentRequest")
 
     with open(QR_TEXT_FILE, "w") as f:
         f.write(emv_qr_string)

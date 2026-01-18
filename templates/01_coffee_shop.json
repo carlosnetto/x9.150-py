@@ -13,6 +13,7 @@
         "MCC": "5812"
     },
     "bill": {
+        "paymentTiming": "immediate",
         "description": "Coffee and pastry at Brew & Bean Coffee",
         "order": {
             "number": "COF-2026-001",
@@ -21,8 +22,7 @@
         "amountDue": {
             "amount": 550,
             "currency": "USD"
-        },
-        "paymentTiming": "immediate"
+        }
     },
     "additionalInformation": [
         {

@@ -40,6 +40,7 @@
         "MCC": "4900"
     },
     "bill": {
+        "paymentTiming": "immediate",
         "description": "Electricity service for April 2024",
         "order": {
             "number": "order number containing any printable ASCII",
@@ -107,7 +108,6 @@
             "validUntil": "2024-05-10T23:59:59Z",
             "amount": 18834,
             "editable": {
-                "payerCanEdit": true,
                 "range": {
                     "min": 10000,
                     "max": 18834

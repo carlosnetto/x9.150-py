@@ -13,6 +13,7 @@
         "MCC": "5942"
     },
     "bill": {
+        "paymentTiming": "immediate",
         "description": "Book purchase at City Lights Books",
         "order": {
             "number": "BK-2026-005",
@@ -21,8 +22,7 @@
         "amountDue": {
             "amount": 3200,
             "currency": "USD"
-        },
-        "paymentTiming": "immediate"
+        }
     },
     "paymentMethods": [
         {

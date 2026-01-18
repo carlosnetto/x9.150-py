@@ -23,6 +23,7 @@
         "MCC": "5812"
     },
     "bill": {
+        "paymentTiming": "immediate",
         "description": "Pizza order from Tony's Pizza",
         "order": {
             "number": "PIZ-2026-004",
@@ -44,8 +45,7 @@
                 20,
                 25
             ]
-        },
-        "paymentTiming": "immediate"
+        }
     },
     "additionalInformation": [
         {

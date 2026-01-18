@@ -1,0 +1,43 @@
+openapi: 3.0.3
+info:
+  title: Payment Notification API
+  version: 1.0.0
+paths:
+  /payment-notifications:
+    post:
+      summary: Receive payment notification
+      description: >
+        The Payer's PSP sends a signed notification to the Creditor's PSP. This can be an initiation notification
+        (PAYMENT_INITIATED, without transactionId) to inform that payment is starting, or a final notification
+        (PAID, with transactionId) to confirm completion of the credit transfer.
+        The request body must be a JWS. The protected header must include 'iat', 'ttl', 'correlationId', and 'crit'. 
+        The payload must follow the 'NotificationPayload' schema.
+        All URLs shall adhere to the syntax dictated by RFC 3986.
+      requestBody:
+        required: true
+        content:
+          application/jose:
+            schema:
+              $ref: './openapi.yaml#/components/schemas/JWS'
+      responses:
+        '200':
+          description: Notification acknowledged with a signed response for non-repudiation.
+          content:
+            application/jose:
+              schema:
+                $ref: './openapi.yaml#/components/schemas/JWS'
+              # The payload of this JWS follows the 'SignedStatusCodePayload' schema.
+        '400':
+          description: Bad Request. Returns a signed status code for non-repudiation.
+          content:
+            application/jose:
+              schema:
+                $ref: './openapi.yaml#/components/schemas/JWS'
+              # The payload of this JWS follows the 'SignedStatusCodePayload' schema.
+        '422':
+          description: Unprocessable Entity (e.g., invalid status transition). Returns a signed status code.
+          content:
+            application/jose:
+              schema:
+                $ref: './openapi.yaml#/components/schemas/JWS'
+              # The payload of this JWS follows the 'SignedStatusCodePayload' schema.

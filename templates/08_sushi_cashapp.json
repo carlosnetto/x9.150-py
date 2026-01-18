@@ -23,6 +23,7 @@
         "MCC": "5812"
     },
     "bill": {
+        "paymentTiming": "immediate",
         "description": "Sushi dinner at Sakura Sushi",
         "order": {
             "number": "SUS-2026-008",
@@ -44,8 +45,7 @@
                 25,
                 28
             ]
-        },
-        "paymentTiming": "immediate"
+        }
     },
     "additionalInformation": [
         {

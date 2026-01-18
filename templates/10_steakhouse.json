@@ -13,6 +13,7 @@
         "MCC": "5812"
     },
     "bill": {
+        "paymentTiming": "immediate",
         "description": "Dinner at Prime Cut Steakhouse",
         "order": {
             "number": "STK-2026-010",
@@ -33,8 +34,7 @@
                 "25%",
                 "30%"
             ]
-        },
-        "paymentTiming": "immediate"
+        }
     },
     "additionalInformation": [
         {

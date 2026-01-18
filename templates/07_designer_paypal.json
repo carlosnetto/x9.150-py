@@ -27,6 +27,7 @@
         "MCC": "7333"
     },
     "bill": {
+        "paymentTiming": "immediate",
         "description": "Design services from Creative Studio",
         "order": {
             "number": "CS-2026-007",
@@ -38,8 +39,7 @@
         },
         "tip": {
             "allowed": false
-        },
-        "paymentTiming": "immediate"
+        }
     },
     "paymentMethods": [
         {

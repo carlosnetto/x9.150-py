@@ -13,6 +13,7 @@
         "MCC": "5812"
     },
     "bill": {
+        "paymentTiming": "immediate",
         "description": "Fine dining experience at The Golden Fork",
         "order": {
             "number": "FD-2026-002",
@@ -34,8 +35,7 @@
                 25,
                 30
             ]
-        },
-        "paymentTiming": "immediate"
+        }
     },
     "additionalInformation": [
         {

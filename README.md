@@ -56,6 +56,16 @@ python payee_server.py --domain <your-domain>.pinggy.io
 
 This ensures the QR code contains the correct external URL.
 
+### Testing Options
+
+The Payee Server (`qr_server.py`) and Payer Simulator (`qr_payer.py`) support specific flags for testing error handling:
+
+*   `--failCorrelationId`: When enabled, the server will intentionally return a mismatched `correlationId` in the JWS protected header. This allows testing the Payer's non-repudiation and session tracking validation logic.
+*   `--failiat`: When enabled, the server will return an `iat` (Issued At) timestamp from 11 minutes ago, triggering the Payer's "too old" security check.
+*   `--failttl`: When enabled, the server will return a JWS that is already expired based on the `ttl` (Time To Live) header.
+*   `--failSignature`: When enabled, the component will intentionally corrupt the JWS signature (simulating a calculation error) to test the recipient's signature verification logic.
+*   `--failjwscustom`: (Payer only) Randomly omits one or more mandatory JWS headers (`iat`, `ttl`, `correlationId`) to test server-side validation of critical headers.
+
 ## How It Works
 
 1.  **Startup**: The script generates an ECC key pair (simulating the Payee PSP's keys).

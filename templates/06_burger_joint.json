@@ -13,6 +13,7 @@
         "MCC": "5812"
     },
     "bill": {
+        "paymentTiming": "immediate",
         "description": "Lunch at Big Burger Bar",
         "order": {
             "number": "BB-2026-006",
@@ -34,8 +35,7 @@
                 20,
                 22
             ]
-        },
-        "paymentTiming": "immediate"
+        }
     },
     "additionalInformation": [
         {

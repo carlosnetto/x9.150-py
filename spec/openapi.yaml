@@ -1,0 +1,497 @@
+openapi: 3.0.3
+info:
+  title: X9.150 Payment Request API
+  description: API for managing and processing payment requests based on the X9.150 standard.
+  version: 1.0.0
+paths:
+  /payment-requests/fetch:
+    $ref: './payment_request.yaml#/paths/~1payment-requests~1fetch'
+  /payment-notifications:
+    $ref: './payment_notification.yaml#/paths/~1payment-notifications'
+
+components:
+  schemas:
+    PaymentRequest:
+      description: "The root container for the X9.150 payment request, encapsulating all data required to initiate a credit transfer via QR code."
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/UUIDNoDashes'
+        revision:
+          type: integer
+          description: "Sequence number used to track updates to the payment request. Incremented when details change. Starts with 0"
+          example: 0
+        qrCodeContent:
+          type: string
+          description: "The raw string content obtained from scanning the QR code, encoded in base64url. Note: In the EMV QR structure, Tag 26 Subtag 01 omits the protocol and the '://' separator (e.g., 'bank.com/fetch/uid') to save space and assumes https://. This allows the Payer to verify that the scanned QR code matches the one linked to this JSON payload."
+        createdAt:
+          description: "The moment the payment request record was first generated."
+          $ref: '#/components/schemas/Timestamp'
+        revisedAt:
+          description: "The timestamp of the last modification to this payment request."
+          $ref: '#/components/schemas/Timestamp'
+        sentAt:
+          description: "The timestamp when the request was dispatched to the payer or payer's PSP. It's updated every time the API is requested."
+          $ref: '#/components/schemas/Timestamp'
+        validUntil:
+          description: "The expiration timestamp after which the QR code should no longer be accepted for processing. If this time passes, the Payer PSP should fetch the payload again; a new revision may be returned with updated adjustments (e.g., late fees) and an extended validUntil."
+          $ref: '#/components/schemas/Timestamp'
+        status:
+          $ref: '#/components/schemas/PaymentStatus'
+        paymentNotification:
+          type: string
+          format: uri
+          description: "The URL (webhook) where the payer's PSP sends status updates (e.g., PAYMENT_INITIATED, PAID). Shall adhere to the syntax dictated by RFC 3986."
+        creditor:
+          $ref: '#/components/schemas/Creditor'
+        bill:
+          $ref: '#/components/schemas/Bill'
+        unstructured:
+          type: string
+          maxLength: 140
+          description: "Free-text remittance information for the payer, often used for human-readable references."
+          example: "Account: 987650001, Meter: MTR45567"
+        additionalInformation:
+          type: array
+          description: "A collection of key-value pairs for extended metadata not covered by the standard schema."
+          items:
+            $ref: '#/components/schemas/AdditionalInfo'
+        paymentMethods:
+          type: array
+          minItems: 1
+          description: "List of supported payment rails and currencies available for this request."
+          items:
+            $ref: '#/components/schemas/PaymentMethod'
+        statusCode:
+          type: integer
+          description: "HTTP status code echoed in the payload for non-repudiation."
+          example: 200
+
+    PaymentStatus:
+      description: >
+        The lifecycle state of the payment request:
+        * ACTIVE - payload is available for payment.
+        * PAYMENT_INITIATED - payment has been initiated against the payload.
+        * PAID - payload has been paid.
+        * CANCELLED - payload has been cancelled.
+      type: string
+      enum: [ACTIVE, PAYMENT_INITIATED, PAID, CANCELLED]
+
+    Timestamp:
+      type: string
+      format: date-time
+      description: "UTC timestamp in RFC 3339 format with millisecond precision (e.g., 2024-04-30T12:00:00.000Z)."
+      example: "2024-04-30T12:00:00.000Z"
+
+    Date:
+      type: string
+      format: date
+      description: "A regular date carrying just day, month, and year (YYYY-MM-DD)."
+      example: "2024-04-30"
+
+    UUIDNoDashes:
+      type: string
+      pattern: '^[0-9a-fA-F]{32}$'
+      description: UUID without dashes for better compatibility with some payment rails that can't fit 36 chars.
+      example: "123e4567e89b12d3a456426614174000"
+
+    UUIDWithDashes:
+      type: string
+      pattern: '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+      description: "Standard UUID with dashes used for session tracking and correlation."
+      example: "123e4567-e89b-12d3-a456-426614174000"
+
+    JWSHeader:
+      type: object
+      description: "The protected header structure for X9.150 JWS objects."
+      properties:
+        iat:
+          type: integer
+          format: int64
+          description: "Issued At: Unix timestamp (seconds) when the JWS was created."
+        ttl:
+          type: integer
+          format: int64
+          description: "Time To Live: Expiration timestamp in Unix milliseconds."
+        correlationId:
+          $ref: '#/components/schemas/UUIDWithDashes'
+        crit:
+          type: array
+          items:
+            type: string
+          description: "JWS Critical Header Parameter (RFC 7515). Must contain ['iat', 'ttl', 'correlationId'] to ensure these fields are mandatory to be understood and processed by the recipient."
+          example: ["iat", "ttl", "correlationId"]
+      required:
+        - iat
+        - ttl
+        - correlationId
+        - crit
+
+    Email:
+      type: string
+      format: email
+      pattern: '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,254}$'
+      description: "Standard email address format for contact and billing inquiries."
+
+    PhoneNumber:
+      type: string
+      pattern: '^\+[1-9]\d{1,20}$'
+      description: "Phone number in E.164 format (e.g., +15551234567)."
+
+    MCC:
+      type: string
+      pattern: '^\d{4}$'
+      description: "ISO 18245 Merchant Category Code (4 digits) classifying the type of business."
+
+    CountryCode:
+      type: string
+      pattern: '^[A-Z]{2}$'
+      description: "ISO 3166-1 alpha-2 country code (e.g., 'US')."
+
+    CurrencyCode:
+      type: string
+      pattern: '^[a-zA-Z0-9._-]{1,32}$'
+      description: "ISO 4217 currency code (e.g., 'USD') or digital asset ticker (e.g., 'USDC', 'WETH-V2'). This field supports 1 to 32 characters and includes common separators (., _, -) to accommodate stablecoins and other ERC20 tokens."
+
+    MonetaryAmount:
+      type: integer
+      format: int64
+      minimum: 0
+      description: >
+        A positive integer representing the absolute amount in the minor unit of the currency (e.g., cents for USD). 
+        This value must be zero or greater.
+
+    SignedMonetaryAmount:
+      type: integer
+      format: int64
+      description: >
+        A signed integer representing a change in amount (delta) in the minor unit of the currency. 
+        Positive values represent surcharges; negative values represent discounts.
+
+    JWS:
+      type: string
+      description: >
+        A JSON Web Signature (RFC 7515) string representing a signed payload. 
+        The protected header must follow the 'JWSHeader' schema, including 'iat' (Unix seconds), 
+        'ttl' (Unix milliseconds), 'correlationId' (UUID with dashes), and the 'crit' parameter marking these as critical.
+
+    FetchRequestPayload:
+      type: object
+      description: "The payload structure contained within the JWS for a fetch request. It allows the Payer PSP to request the full PaymentRequest details using the scanned QR data."
+      properties:
+        qrCodeContent:
+          type: string
+          description: "The raw string content obtained from scanning the QR code, encoded in base64url. This is used to verify the integrity of the scanned data."
+      required:
+        - qrCodeContent
+
+    NotificationPayload:
+      type: object
+      description: "The payload structure contained within the JWS for a payment notification, providing details of the executed transaction."
+      properties:
+        id:
+          $ref: '#/components/schemas/UUIDNoDashes'
+        payment:
+          type: object
+          description: "Details of the financial transaction performed."
+          properties:
+            amount:
+              $ref: '#/components/schemas/MonetaryAmount'
+            tipAmount:
+              $ref: '#/components/schemas/MonetaryAmount'
+            currency:
+              $ref: '#/components/schemas/CurrencyCode'
+            network:
+              type: string
+              maxLength: 35
+            transactionId:
+              type: string
+              maxLength: 128
+              description: >
+                The unique identifier for the transaction. This field is optional. If the payee is notified prior to sending funds, 
+                the transactionId will be absent (initiation/pre-commit). After sending the funds, a second notification is 
+                performed including the transactionId, marking the payment as finished and the QR code as completed.
+            paymentTiming:
+              type: string
+              enum: [immediate, deferred]
+              description: "The timing of the payment as specified in the bill."
+          required: [amount, currency, network, paymentTiming]
+        payer:
+          type: object
+          description: "Flexible object for payer information, allowing custom tags for extensibility."
+          properties:
+            info:
+              type: string
+              description: "Optional contact or identification info for the payer."
+          additionalProperties: true
+        expectedDate:
+          $ref: '#/components/schemas/Timestamp'
+      required:
+        - id
+        - payment
+
+    SignedStatusCodePayload:
+      type: object
+      description: "The payload structure contained within a JWS response for non-repudiation. It echoes the HTTP status code to prove the server processed the request and generated this specific result."
+      properties:
+        statusCode:
+          type: integer
+          description: "The HTTP status code of the response, mirrored in the signed payload."
+          example: 200
+      required:
+        - statusCode
+
+    Creditor:
+      description: "The entity (Payee) to whom the financial obligation is owed."
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 50
+          description: "Legal name of the creditor."
+        phone:
+          $ref: '#/components/schemas/PhoneNumber'
+        email:
+          $ref: '#/components/schemas/Email'
+        address:
+          $ref: '#/components/schemas/Address'
+        ultimateCreditor:
+          $ref: '#/components/schemas/UltimateCreditor'
+        MCC:
+          $ref: '#/components/schemas/MCC'
+      required:
+        - MCC
+
+    UltimateCreditor:
+      description: "The final beneficiary of the funds, if different from the Creditor (e.g., a sub-merchant in a marketplace)."
+      type: object
+      properties:
+        account:
+          type: object
+          description: "The specific account identifier for the ultimate beneficiary."
+          properties:
+            id:
+              type: string
+              maxLength: 256
+              description: "The account handle, email, or virtual account number. Any format valid within the creditor"
+            schemaName:
+              type: string
+              maxLength: 70
+              description: "Name of the schema within that creditor (ex.: $cashTag, e-mail, etc.)"
+        name:
+          type: string
+          maxLength: 50
+          description: "Name of the ultimate beneficiary."
+        phone:
+          $ref: '#/components/schemas/PhoneNumber'
+        email:
+          $ref: '#/components/schemas/Email'
+        address:
+          $ref: '#/components/schemas/Address'
+
+    Address:
+      description: "Geographic location details for an entity."
+      type: object
+      properties:
+        line1:
+          type: string
+          maxLength: 60
+        line2:
+          type: string
+          maxLength: 60
+        city:
+          type: string
+          maxLength: 40
+        state:
+          type: string
+          maxLength: 30
+      oneOf:
+        - title: US Address
+          properties:
+            country:
+              type: string
+              enum: [US]
+              description: "United States"
+            postalCode:
+              type: string
+              pattern: '^\d{5}(-\d{4})?$'
+              maxLength: 10
+              description: "US ZIP code format: 99999 or 99999-9999"
+        - title: International Address
+          properties:
+            country:
+              $ref: '#/components/schemas/CountryCode'
+            postalCode:
+              type: string
+              maxLength: 20
+              description: "Free format postal code for non-US countries."
+
+    Bill:
+      description: "Detailed information regarding the invoice or order being paid."
+      type: object
+      properties:
+        description:
+          type: string
+          maxLength: 100
+          description: "A brief summary of the goods or services provided."
+        paymentTiming:
+          type: string
+          enum: [immediate, deferred]
+          description: "Indicates whether the payment is due immediately or at a later date."
+        order:
+          type: object
+          description: "Reference to the commercial purchase order."
+          properties:
+            number:
+              type: string
+              maxLength: 50
+            date:
+              $ref: '#/components/schemas/Date'
+              description: "The date the order was placed (YYYY-MM-DD)."
+        invoice:
+          $ref: '#/components/schemas/Invoice'
+        amountDue:
+          $ref: '#/components/schemas/AmountDue'
+        tip:
+          $ref: '#/components/schemas/Tip'
+      required:
+        - paymentTiming
+
+    Invoice:
+      description: "Formal billing document details."
+      type: object
+      properties:
+        number:
+          type: string
+          maxLength: 50
+          description: "The unique invoice identifier."
+        date:
+          $ref: '#/components/schemas/Date'
+          description: "The date the invoice was issued (YYYY-MM-DD)."
+        dueDate:
+          $ref: '#/components/schemas/Timestamp'
+        invoicee:
+          type: object
+          description: "The entity (Payer) to whom the invoice was issued."
+          properties:
+            name:
+              type: string
+              maxLength: 50
+            phone:
+              $ref: '#/components/schemas/PhoneNumber'
+            email:
+              $ref: '#/components/schemas/Email'
+            address:
+              $ref: '#/components/schemas/Address'
+
+    AmountDue:
+      description: "The total financial value requested, including potential adjustments."
+      type: object
+      properties:
+        amount:
+          $ref: '#/components/schemas/MonetaryAmount'
+        currency:
+          $ref: '#/components/schemas/CurrencyCode'
+        adjustments:
+          type: array
+          description: "Discounts, surcharges, or taxes applied to the base amount."
+          items:
+            $ref: '#/components/schemas/Adjustment'
+
+    Adjustment:
+      description: "A modification to the total amount (e.g., an early payment discount)."
+      type: object
+      properties:
+        explanation:
+          type: string
+          maxLength: 200
+          description: "Human-readable reason for the adjustment."
+        amount:
+          $ref: '#/components/schemas/SignedMonetaryAmount'
+        validUntil:
+          allOf:
+            - $ref: '#/components/schemas/Timestamp'
+          description: >
+            The last millisecond this adjustment is valid. If the QR code is not paid by this time, a new fetch is required to update the payload with current conditions (e.g., to include late fees).
+
+    Tip:
+      description: "Configuration for optional gratuity."
+      type: object
+      properties:
+        allowed:
+          type: boolean
+        range:
+          type: object
+          description: "The minimum and maximum allowed tip percentages. Values are integers from 0 to 999, supporting 3 decimal places (e.g., 155 = 15.5%)."
+          properties:
+            min:
+              type: integer
+              minimum: 0
+              maximum: 999
+            max:
+              type: integer
+              minimum: 0
+              maximum: 999
+        presets:
+          type: array
+          description: "Suggested tip percentages for the UI."
+          items:
+            type: integer
+            minimum: 0
+            maximum: 999
+
+    AdditionalInfo:
+      description: "Generic metadata container."
+      type: object
+      properties:
+        key:
+          type: string
+          maxLength: 30
+        value:
+          type: string
+          maxLength: 218
+
+    PaymentMethod:
+      description: "Defines a specific currency and network combination for fulfilling the payment."
+      type: object
+      properties:
+        currency:
+          $ref: '#/components/schemas/CurrencyCode'
+        amount:
+          $ref: '#/components/schemas/MonetaryAmount'
+        validUntil:
+          $ref: '#/components/schemas/Timestamp'
+        editable:
+          type: object
+          description: "Constraints on whether the payer can modify the payment amount. The presence of this object indicates the amount is editable."
+          properties:
+            range:
+              type: object
+              description: "The allowed range if the amount is editable."
+              properties:
+                min:
+                  $ref: '#/components/schemas/MonetaryAmount'
+                max:
+                  $ref: '#/components/schemas/MonetaryAmount'
+        networks:
+          type: object
+          description: "A map of payment networks (e.g., 'FedNow', 'Base') and their specific routing details."
+          additionalProperties:
+            type: object
+            properties:
+              routingNumber:
+                type: string
+                maxLength: 9
+                description: "The financial institution's routing identifier (ABA, BIC, etc.)."
+              accountNumber:
+                type: string
+                maxLength: 17
+                description: "The specific account number at the institution."
+              protectionType:
+                type: string
+                maxLength: 15
+                description: "The security mechanism used (e.g., 'tokenized', 'cleartext')."
+              address:
+                type: string
+                maxLength: 128
+                description: "The public wallet address for DLT/Blockchain networks."

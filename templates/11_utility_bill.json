@@ -13,6 +13,7 @@
         "MCC": "4900"
     },
     "bill": {
+        "paymentTiming": "deferred",
         "description": "Electricity service for January 2026",
         "invoice": {
             "number": "INV-2026-01-99887",
@@ -42,8 +43,7 @@
         },
         "tip": {
             "allowed": false
-        },
-        "paymentTiming": "deferred"
+        }
     },
     "additionalInformation": [
         {

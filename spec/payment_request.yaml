@@ -1,0 +1,41 @@
+openapi: 3.0.3
+info:
+  title: Payment Request Fetch API
+  version: 1.0.0
+paths:
+  /payment-requests/fetch:
+    post:
+      summary: Fetch payment request details
+      description: >
+        The Payer's PSP calls this endpoint to resolve the raw QR code data into a full X9.150 PaymentRequest object. This endpoint can be called even after a previous payload's validUntil has passed to retrieve updated payment terms, such as new adjustments for late fees.
+        The request body must be a JWS (JSON Web Signature) as per RFC 7515. 
+        The protected header must include 'iat', 'ttl', 'correlationId', and 'crit'. The payload must match the 'FetchRequestPayload' schema. 
+        All URLs shall adhere to the syntax dictated by RFC 3986.
+      requestBody:
+        required: true
+        content:
+          application/jose:
+            schema:
+              $ref: './openapi.yaml#/components/schemas/JWS'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/jose:
+              schema:
+                $ref: './openapi.yaml#/components/schemas/JWS'
+              # The payload of this JWS follows the 'PaymentRequest' schema.
+        '400':
+          description: Bad Request (e.g., invalid JWS signature or malformed payload). Returns a signed status code.
+          content:
+            application/jose:
+              schema:
+                $ref: './openapi.yaml#/components/schemas/JWS'
+              # The payload of this JWS follows the 'SignedStatusCodePayload' schema.
+        '404':
+          description: Payment Request not found for the provided QR content. Returns a signed status code.
+          content:
+            application/jose:
+              schema:
+                $ref: './openapi.yaml#/components/schemas/JWS'
+              # The payload of this JWS follows the 'SignedStatusCodePayload' schema.

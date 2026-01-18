@@ -1,7 +1,7 @@
 <!-- Developed in Jan 2026, author carlos.netto@gmail.com. -->
 <!-- Purpose: Validate the X9.150 specification. -->
 <!-- Not for production use; intended only to prove the spec. -->
-# X9.150 Secure Payment QR Code Demo
+# X9.150 Secure Payment QR Code POC
 
 This POC shows how the new **ANSI X9.150 QR code payment standard** can work securely in the real world. It proves how the X9 digital certificate can be leveraged to prevent fake or tampered QR codes, ensuring both sides of the transaction can trust each other.
 

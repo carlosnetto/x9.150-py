@@ -15,23 +15,26 @@ def resolve_ref(spec, ref):
     return curr
 
 def get_info(schema, spec):
-    """Extracts display type, the actual schema object, pattern, and array status."""
+    """Extracts display type, the actual schema object, pattern, array status, and description."""
+    description = schema.get("description", "")
     if "$ref" in schema:
         ref = schema["$ref"]
         name = ref.split("/")[-1]
         resolved = resolve_ref(spec, ref)
         pattern = resolved.get("pattern", "")
         is_array = "Yes" if resolved.get("type") == "array" else "No"
-        return name, resolved, pattern, is_array
+        if not description:
+            description = resolved.get("description", "")
+        return name, resolved, pattern, is_array, description
     
     t = schema.get("type", "string")
-    return t, schema, schema.get("pattern", ""), ("Yes" if t == "array" else "No")
+    return t, schema, schema.get("pattern", ""), ("Yes" if t == "array" else "No"), description
 
 def walk(schema, spec, path, mandatory, rows, seen=None):
     """Recursively traverses the schema to flatten the structure."""
     if seen is None: seen = set()
     
-    t_name, actual, pattern, is_array = get_info(schema, spec)
+    t_name, actual, pattern, is_array, description = get_info(schema, spec)
     
     # Prevent infinite recursion for circular refs
     if "$ref" in schema:
@@ -45,7 +48,7 @@ def walk(schema, spec, path, mandatory, rows, seen=None):
         for k, v in props.items():
             m = "Yes" if k in reqs else "No"
             p_path = f"{path}.{k}"
-            p_t_name, p_actual, p_pattern, p_is_array = get_info(v, spec)
+            p_t_name, p_actual, p_pattern, p_is_array, p_description = get_info(v, spec)
             
             # Extract constraints
             p_min_len = p_actual.get("minLength", "")
@@ -53,7 +56,7 @@ def walk(schema, spec, path, mandatory, rows, seen=None):
             p_min_val = p_actual.get("minimum", "")
             p_max_val = p_actual.get("maximum", "")
 
-            rows.append([p_path, m, p_t_name, p_pattern, p_is_array, p_min_len, p_max_len, p_min_val, p_max_val])
+            rows.append([p_path, m, p_t_name, p_pattern, p_is_array, p_min_len, p_max_len, p_min_val, p_max_val, p_description])
             walk(v, spec, p_path, m, rows, seen.copy())
 
     # Handle polymorphic structures (like Address)
@@ -65,10 +68,10 @@ def walk(schema, spec, path, mandatory, rows, seen=None):
     if actual.get("type") == "array":
         items = actual.get("items", {})
         i_path = f"{path}[]"
-        i_t_name, i_actual, i_pattern, i_is_array = get_info(items, spec)
+        i_t_name, i_actual, i_pattern, i_is_array, i_description = get_info(items, spec)
         # If items are primitives, add a row to show constraints (e.g. for presets)
         if i_actual.get("type") != "object":
-            rows.append([i_path, "No", i_t_name, i_pattern, i_is_array, i_actual.get("minLength", ""), i_actual.get("maxLength", ""), i_actual.get("minimum", ""), i_actual.get("maximum", "")])
+            rows.append([i_path, "No", i_t_name, i_pattern, i_is_array, i_actual.get("minLength", ""), i_actual.get("maxLength", ""), i_actual.get("minimum", ""), i_actual.get("maximum", ""), i_description])
         walk(items, spec, i_path, "No", rows, seen.copy())
 
 def main():
@@ -93,7 +96,7 @@ def main():
     ]
 
     for label, schema_name in api_payloads:
-        rows.append([f"::: {label} :::", "", "", "", "", "", "", "", ""])
+        rows.append([f"::: {label} :::", "", "", "", "", "", "", "", "", ""])
         schema = {"$ref": f"#/components/schemas/{schema_name}"}
         walk(schema, spec, "$", "Yes", rows)
         rows.append([]) 
@@ -101,7 +104,7 @@ def main():
     output_file = "openapi_flattened.csv"
     with open(output_file, 'w', newline='') as f:
         writer = csv.writer(f)
-        writer.writerow(["JSON Path", "Mandatory", "Type", "Regexp", "Array", "Min Length", "Max Length", "Min Value", "Max Value"])
+        writer.writerow(["JSON Path", "Mandatory", "Type", "Regexp", "Array", "Min Length", "Max Length", "Min Value", "Max Value", "Description"])
         writer.writerows(rows)
 
     print(f"Flattened OpenAPI definition exported to {output_file}")

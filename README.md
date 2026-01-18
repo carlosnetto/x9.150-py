@@ -66,27 +66,36 @@ The Payee Server (`qr_server.py`) and Payer Simulator (`qr_payer.py`) support sp
 *   `--failSignature`: When enabled, the component will intentionally corrupt the JWS signature (simulating a calculation error) to test the recipient's signature verification logic.
 *   `--failjwscustom`: (Payer only) Randomly omits one or more mandatory JWS headers (`iat`, `ttl`, `correlationId`) to test server-side validation of critical headers.
 
+### Specification Documentation
+
+To facilitate the mapping between the technical OpenAPI specification and the X9.150 documentation, use the `dump_open_api.py` utility:
+
+```bash
+python3 dump_open_api.py spec/openapi.yaml
+```
+This generates `openapi_flattened.csv`, providing a flattened view of all JSON paths, mandatory requirements, regex patterns, and data constraints.
+
 ## How It Works
 
 1.  **Startup**: The script generates an ECC key pair (simulating the Payee PSP's keys).
-2.  **QR Generation**: It creates a unique Transaction ID and embeds the URL (`https://<domain>/scan/<id>`) into the EMV QR string.
+2.  **QR Generation**: It creates a unique Transaction ID and embeds the URL (`https://<domain>/fetch/<id>`) into the EMV QR string.
 3.  **Image Creation**: Saves the QR code as `qrcode.png`.
 4.  **Server**: Starts a Flask server listening for POST requests.
 
-### The "Broker" Logic
-The endpoint `/scan/<payload_id>` handles two types of interactions:
+### API Endpoints
+The server provides two primary endpoints for the payment flow:
 
-1.  **Payment Payload Request**:
+1.  **Payment Payload Request (`/fetch/<payload_id>`)**:
     *   **Trigger**: The Payer App scans the QR and sends a POST request containing a JWS with `qrCodeContent`.
     *   **Action**: The server returns the signed Payment Payload (JWS).
 
-2.  **Payment Notification**:
+2.  **Payment Notification (`/notify/<payload_id>`)**:
     *   **Trigger**: The Payer PSP sends a POST request containing a JWS with a `payment` object (confirming the transaction).
     *   **Action**: The server verifies the signature using the Payer's public key (simulated) and prints the notification details to the console. It returns a signed JWS with `statusCode: 200`.
 
 ## Testing with cURL
 
-Since the server uses a single endpoint, you can simulate the Payer PSP using `curl`.
+You can simulate the Payer PSP using `curl` against the specific endpoints.
 
 **1. Request the Payment Payload:**
 *(Simulates scanning the QR code)*

@@ -51,7 +51,7 @@ python qr_generator.py templates/01_coffee_shop.json
 If you want to scan the QR code with a real mobile device or external app, use a tunneling service (like `ssh -p 443 -R0:localhost:5000 a.pinggy.io`) and pass the domain to the script:
 
 ```bash
-python payee_server.py --domain <your-domain>.pinggy.io
+python qr_server.py --domain <your-domain>.pinggy.io
 ```
 
 This ensures the QR code contains the correct external URL.

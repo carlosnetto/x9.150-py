@@ -225,14 +225,14 @@ def display_payload(payload):
             detail_str = ", ".join([f"{dk}: {dv}" for dk, dv in details.items()])
             print(f"{net:15} | {detail_str}")
 
-def pay_usdc_on_base(mnemonic, recipient_address):
-    """Connects to Base and sends 1 USDC."""
+def pay_usdc_on_base(mnemonic, recipient_address, amount_to_pay):
+    """Connects to Base and sends the specified amount of USDC."""
     # Base Mainnet RPC
     w3 = Web3(Web3.HTTPProvider("https://mainnet.base.org"))
     
     if not w3.is_connected():
         print("[!] Could not connect to Base network.")
-        return
+        return None, None
 
     # Enable mnemonic features
     Account.enable_unaudited_hdwallet_features()
@@ -252,14 +252,12 @@ def pay_usdc_on_base(mnemonic, recipient_address):
     
     contract = w3.eth.contract(address=usdc_address, abi=usdc_abi)
     
-    # 1 USDC = 1,000,000 units (6 decimals)
-    # Paying just 1 USDC for testing purposes and lack of balance enough
-    amount_to_pay = 1000000 
-    
+    # amount_to_pay is expected in the token's smallest units (e.g., 6 decimals for USDC)
     recipient = Web3.to_checksum_address(recipient_address)
     nonce = w3.eth.get_transaction_count(account.address)
     
-    print(f"[*] Preparing transaction from {account.address} to {recipient}...")
+    print(f"[*] Preparing transaction from {account.address} to {recipient}")
+    print(f"[*] Amount: {amount_to_pay / 1_000_000:.6f} USDC")
     
     try:
         txn = contract.functions.transfer(recipient, amount_to_pay).build_transaction({
@@ -271,10 +269,21 @@ def pay_usdc_on_base(mnemonic, recipient_address):
         
         signed_txn = w3.eth.account.sign_transaction(txn, private_key=account.key)
         tx_hash = w3.eth.send_raw_transaction(signed_txn.raw_transaction)
-        
-        print(f"[*] USDC Payment Sent! Hash: {w3.to_hex(tx_hash)}")
-        print(f"[*] View on Explorer: https://basescan.org/tx/{w3.to_hex(tx_hash)}")
-        return w3.to_hex(tx_hash), account.address
+        tx_hex = w3.to_hex(tx_hash)
+
+        print(f"[*] USDC Payment Submitted! Hash: {tx_hex}")
+        print(f"[*] Waiting for confirmation on Base blockchain...")
+
+        receipt = w3.eth.wait_for_transaction_receipt(tx_hash)
+        if receipt['status'] == 1:
+            print(f"[OK] Transaction confirmed in block {receipt['blockNumber']}!")
+            print(f"[*] View on Explorer: https://basescan.org/tx/{tx_hex}")
+            return tx_hex, account.address
+        else:
+            print(f"[!] Transaction failed on-chain (Status: 0).")
+            print(f"[*] View on Explorer: https://basescan.org/tx/{tx_hex}")
+            return None, None
+
     except Exception as e:
         print(f"[!] Blockchain transaction failed: {e}")
         return None, None
@@ -321,17 +330,41 @@ def sign_jws_with_fail_logic(payload, private_key_pem, headers):
     token = jws.sign(payload, private_key_pem, headers=headers, algorithm='ES256')
     
     if FAIL_SIGNATURE:
-        print("[!] Testing Mode: Intentionally corrupting the signature (skipping first 4 bytes of payload calculation).")
-        # We sign a version of the payload missing the first 4 bytes
-        # but we package it with the original header and payload.
-        p_str = json.dumps(payload) if isinstance(payload, dict) else payload
-        wrong_token = jws.sign(p_str[4:] if len(p_str) > 4 else p_str, private_key_pem, headers=headers, algorithm='ES256')
-        
+        print("[!] Testing Mode: Intentionally corrupting the signature (modifying the signature string).")
         parts = token.split('.')
-        wrong_parts = wrong_token.split('.')
-        return f"{parts[0]}.{parts[1]}.{wrong_parts[2]}"
+        # Modify the last character of the signature part to invalidate it
+        sig = parts[2]
+        corrupted_sig = sig[:-1] + ('0' if sig[-1] != '0' else '1')
+        return f"{parts[0]}.{parts[1]}.{corrupted_sig}"
         
     return token
+
+def log_server_error(resp):
+    """Logs server error, parsing JWS if present for better debugging."""
+    content = resp.text.strip()
+    if content.count('.') == 2:
+        try:
+            header = jws.get_unverified_header(content)
+            claims = jws.get_unverified_claims(content)
+            if isinstance(claims, bytes):
+                claims = claims.decode('utf-8')
+            
+            try:
+                payload = json.loads(claims)
+            except:
+                payload = claims
+            
+            parts = content.split('.')
+            debug_info = {
+                "header": header,
+                "payload": payload,
+                "signature": parts[2]
+            }
+            print(json.dumps(debug_info, indent=2))
+            return
+        except:
+            pass
+    print(content)
 
 def run_payer(fail_sig=False, fail_jws_custom=False):
     global FAIL_SIGNATURE
@@ -400,7 +433,7 @@ def run_payer(fail_sig=False, fail_jws_custom=False):
             if field in headers:
                 del headers[field]
 
-    signed_jws = jws.sign(payload, private_key_pem, headers=headers, algorithm='ES256')
+    signed_jws = sign_jws_with_fail_logic(payload, private_key_pem, headers)
 
     # 5. Call the fetch method
     print(f"[*] Sending Payment Payload Request to {fetch_url}...")
@@ -444,11 +477,13 @@ def run_payer(fail_sig=False, fail_jws_custom=False):
             
             # --- Blockchain Payment Step ---
             usdc_base_address = None
+            usdc_amount = 0
             for pm in payload_json.get("paymentMethods", []):
                 if pm.get("currency") == "USDC":
                     networks = pm.get("networks", {})
                     if "Base" in networks:
                         usdc_base_address = networks["Base"].get("address")
+                        usdc_amount = pm.get("amount", 0)
                         break
             
             if usdc_base_address:
@@ -458,7 +493,11 @@ def run_payer(fail_sig=False, fail_jws_custom=False):
                         mnemonic = " ".join([line.strip() for line in f if line.strip()])
                     
                     print(f"\n[*] USDC (Base) payment method detected.")
-                    tx_hash, payer_addr = pay_usdc_on_base(mnemonic, usdc_base_address)
+
+                    # Dividing the requested amount by 100 for testing purposes 
+                    # to reduce actual cost while validating the flow.
+                    test_amount = int(usdc_amount / 100)
+                    tx_hash, payer_addr = pay_usdc_on_base(mnemonic, usdc_base_address, test_amount)
 
                     if tx_hash:
                         # --- Step 1: Initial Payment Notification (Initiation) ---
@@ -466,7 +505,7 @@ def run_payer(fail_sig=False, fail_jws_custom=False):
                         notification_payload = {
                             "id": payload_json.get("id"),
                             "payment": {
-                                "amount": 1000000,  # 1 USDC for testing
+                                "amount": test_amount,
                                 "currency": "USDC",
                                 "network": "BASE",
                                 "paymentTiming": payload_json.get("bill", {}).get("paymentTiming")
@@ -500,39 +539,37 @@ def run_payer(fail_sig=False, fail_jws_custom=False):
                             if init_resp_data.get("statusCode") == 200:
                                 print("[*] Payee will accept the payment and the qr code is locked to avoid duplicated payment.")
                             
-                            # --- Step 2: Send funds via Base ---
-                            tx_hash, _ = pay_usdc_on_base(mnemonic, usdc_base_address)
-
-                            if tx_hash:
-                                # --- Step 3: Final Payment Notification (Completion) ---
-                                print("[*] Sending final notification (Status: PAID) with transaction hash...")
-                                notification_payload["payment"]["transactionId"] = tx_hash
-                                validate_against_spec(notification_payload, "NotificationPayload")
+                            # --- Step 2: Final Payment Notification (Completion) ---
+                            # We reuse the tx_hash from the initial successful payment.
+                            # The previous logic incorrectly attempted a second transaction.
+                            print("[*] Sending final notification (Status: PAID) with transaction hash...")
+                            notification_payload["payment"]["transactionId"] = tx_hash
+                            validate_against_spec(notification_payload, "NotificationPayload")
+                            
+                            signed_final_notification = sign_jws_with_fail_logic(notification_payload, private_key_pem, headers)
+                            final_resp = requests.post(notify_url, data=signed_final_notification, headers={'Content-Type': 'application/jose'})
+                            if final_resp.status_code == 200:
+                                final_payload_bytes, final_resp_header = verify_jws(final_resp.text)
                                 
-                                signed_final_notification = sign_jws_with_fail_logic(notification_payload, private_key_pem, headers)
-                                final_resp = requests.post(notify_url, data=signed_final_notification, headers={'Content-Type': 'application/jose'})
-                                if final_resp.status_code == 200:
-                                    final_payload_bytes, final_resp_header = verify_jws(final_resp.text)
-                                    
-                                    if not validate_jws_headers(final_resp_header):
-                                        return
+                                if not validate_jws_headers(final_resp_header):
+                                    return
 
-                                    if final_resp_header.get("correlationId") != correlation_id:
-                                        print(f"[!] Security Error: correlationId mismatch in final notification! Expected {correlation_id}")
-                                        return
+                                if final_resp_header.get("correlationId") != correlation_id:
+                                    print(f"[!] Security Error: correlationId mismatch in final notification! Expected {correlation_id}")
+                                    return
 
-                                    final_resp_data = json.loads(final_payload_bytes.decode('utf-8'))
-                                    validate_against_spec(final_resp_data, "SignedStatusCodePayload")
-                                    if final_resp_data.get("statusCode") == 200:
-                                        print("[*] Final confirmation received and verified.")
-                            else:
-                                print("[!] Payment failed on-chain. Final notification skipped.")
+                                final_resp_data = json.loads(final_payload_bytes.decode('utf-8'))
+                                validate_against_spec(final_resp_data, "SignedStatusCodePayload")
+                                if final_resp_data.get("statusCode") == 200:
+                                    print("[*] Final confirmation received and verified.")
                         else:
-                            print(f"[!] Payee initiation failed: {init_resp.status_code} - {init_resp.text}")
+                            print(f"[!] Payee initiation failed (Status {init_resp.status_code}):")
+                            log_server_error(init_resp)
                 else:
                     print(f"\n[!] USDC method available but {wallet_file} not found.")
         else:
-            print(f"[!] Error from server: {response.text}")
+            print(f"[!] Error from server:")
+            log_server_error(response)
             
     except Exception as e:
         print(f"[!] Request failed: {e}")

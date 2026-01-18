@@ -57,6 +57,13 @@ def generate_key_pair(name, cert_url_base):
     with open(f"{name}_cert.pem", "wb") as f:
         f.write(cert_pem)
 
+    # 3.5 Create a Certificate Signing Request (CSR)
+    csr = x509.CertificateSigningRequestBuilder().subject_name(
+        subject
+    ).sign(private_key, hashes.SHA256())
+    with open(f"{name}.csr", "wb") as f:
+        f.write(csr.public_bytes(serialization.Encoding.PEM))
+
     # 4. Calculate SHA256 Thumbprint (x5t#S256)
     cert_der = cert.public_bytes(serialization.Encoding.DER)
     thumbprint = hashlib.sha256(cert_der).digest()
@@ -86,7 +93,7 @@ def generate_key_pair(name, cert_url_base):
     with open(f"{name}.jwks", "w") as f:
         json.dump(jwks, f, indent=4)
 
-    print(f"Successfully created {name}_key.txt, {name}_cert.pem, and {name}.jwks")
+    print(f"Successfully created {name}_key.txt, {name}_cert.pem, {name}.csr, and {name}.jwks")
 
 if __name__ == "__main__":
     # Arbitrary local URL for the certificate server

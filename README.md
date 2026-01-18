@@ -31,7 +31,7 @@ pip install -r requirements.txt
 ## Usage
 
 ### 1. Generate Keys and Certificates
-First, generate the necessary ECC key pairs, self-signed certificates, and JWKS metadata for both the Payer and Payee.
+First, generate the necessary ECC key pairs, self-signed certificates, Certificate Signing Requests (CSRs), and JWKS metadata for both the Payer and Payee.
 
 ```bash
 python keygen.py

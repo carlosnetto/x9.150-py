@@ -158,15 +158,12 @@ def sign_jws(payload, key_pem, correlation_id=None):
     token = jws.sign(payload, key_pem, headers=headers, algorithm='ES256')
 
     if FAIL_SIGNATURE:
-        print("[!] Testing Mode: Intentionally corrupting the signature (skipping first 4 bytes of payload calculation).")
-        # To simulate the error, we sign a version of the payload missing the first 4 bytes
-        # but we package it with the original header and payload.
-        p_str = json.dumps(payload) if isinstance(payload, dict) else payload
-        wrong_token = jws.sign(p_str[4:] if len(p_str) > 4 else p_str, key_pem, headers=headers, algorithm='ES256')
-        
+        print("[!] Testing Mode: Intentionally corrupting the signature (modifying the signature string).")
         parts = token.split('.')
-        wrong_parts = wrong_token.split('.')
-        return f"{parts[0]}.{parts[1]}.{wrong_parts[2]}"
+        # Modify the last character of the signature part to invalidate it
+        sig = parts[2]
+        corrupted_sig = sig[:-1] + ('0' if sig[-1] != '0' else '1')
+        return f"{parts[0]}.{parts[1]}.{corrupted_sig}"
 
     return token
 
@@ -187,15 +184,67 @@ def verify_jws(token):
         return payload, header
     raise ValueError("No certificate found in JWS headers")
 
+def validate_jws_headers(header):
+    """Validates iat, ttl, and crit list in JWS headers for security and spec compliance."""
+    # 1. Check 'crit' enforcement (RFC 7515)
+    crit = header.get("crit", [])
+    if not isinstance(crit, list):
+        crit = []
+        
+    for field in crit:
+        if field not in header:
+            return False, f"Critical header '{field}' is missing."
+
+    # 2. Validate iat (Issued At)
+    now = int(time.time())
+    iat = header.get("iat")
+    if iat:
+        if iat > now + 60: # 1 minute clock skew allowance
+            return False, "iat is in the future."
+        if now - iat > 300: # 5 minutes threshold
+            return False, f"iat is too old ({now - iat} seconds ago)."
+    
+    # 3. Validate ttl (Time To Live)
+    ttl = header.get("ttl")
+    if ttl:
+        now_ms = int(time.time() * 1000)
+        if now_ms > ttl:
+            return False, f"JWS has expired (ttl: {ttl}, current: {now_ms})."
+            
+    return True, None
+
 @app.route('/fetch/<payload_id>', methods=['POST'])
 def fetch_payload(payload_id):
     """Endpoint for Payer App to retrieve the Payment Payload (Section 6.2)."""
     raw_data = request.get_data(as_text=True).strip()
-    incoming_headers = {}
     try:
         incoming_headers = jws.get_unverified_header(raw_data)
+    except Exception:
+        body = {"statusCode": 400, "error": "Invalid JWS format"}
+        return sign_jws(body, private_key_pem), 400, {'Content-Type': 'application/jose'}
+
+    # Validate JWS headers (including 'crit' enforcement)
+    is_valid, error_msg = validate_jws_headers(incoming_headers)
+    if not is_valid:
+        print(f"[!] JWS Header Validation Error: {error_msg}")
+        body = {"statusCode": 400, "error": error_msg}
+        return sign_jws(body, private_key_pem, incoming_headers.get("correlationId")), 400, {'Content-Type': 'application/jose'}
+
+    # Verify Signature
+    try:
+        payload_bytes, _ = verify_jws(raw_data)
+        claims = payload_bytes.decode('utf-8')
+    except Exception as e:
+        print(f"[!] Signature Verification Failed for Fetch: {e}")
+        body = {"statusCode": 400, "error": "Invalid Signature"}
+        return sign_jws(body, private_key_pem, incoming_headers.get("correlationId")), 400, {'Content-Type': 'application/jose'}
+
+    print(f"\n[*] Incoming Fetch Request for ID: {payload_id}")
+    print(f"[*] JWS Headers: {json.dumps(incoming_headers, indent=2)}")
+    try:
+        print(f"[*] JWS Body: {json.dumps(json.loads(claims), indent=2)}")
     except:
-        pass
+        print(f"[*] JWS Body: {claims}")
 
     if not os.path.exists(PAYLOAD_FILE):
         body = {"statusCode": 404, "error": "Payload file not found"}
@@ -213,10 +262,6 @@ def fetch_payload(payload_id):
         signed_err = sign_jws(body, private_key_pem, incoming_headers.get("correlationId"))
         return signed_err, 404, {'Content-Type': 'application/jose'}
 
-    print(f"\n[*] Payment Payload Request Received for ID: {payload_id}")
-    
-    # Include statusCode in the successful business payload
-    payload_data["statusCode"] = 200
     validate_against_spec(payload_data, "PaymentRequest")
     signed_payload = sign_jws(payload_data, private_key_pem, incoming_headers.get("correlationId"))
     return signed_payload, 200, {'Content-Type': 'application/jose'}
@@ -224,13 +269,30 @@ def fetch_payload(payload_id):
 @app.route('/notify/<payload_id>', methods=['POST'])
 def receive_notification(payload_id):
     """Endpoint for Payer PSP to send Payment Notification (Section 6.3)."""
-    # Pre-extract headers for error reporting if possible
     raw_data = request.get_data(as_text=True).strip()
-    incoming_headers = {}
     try:
         incoming_headers = jws.get_unverified_header(raw_data)
+    except Exception:
+        body = {"statusCode": 400, "error": "Invalid JWS format"}
+        return sign_jws(body, private_key_pem), 400, {'Content-Type': 'application/jose'}
+
+    # Validate JWS headers (including 'crit' enforcement)
+    is_valid, error_msg = validate_jws_headers(incoming_headers)
+    if not is_valid:
+        print(f"[!] JWS Header Validation Error: {error_msg}")
+        body = {"statusCode": 400, "error": error_msg}
+        return sign_jws(body, private_key_pem, incoming_headers.get("correlationId")), 400, {'Content-Type': 'application/jose'}
+
+    print(f"\n[*] Incoming Notification Request for ID: {payload_id}")
+    print(f"[*] JWS Headers: {json.dumps(incoming_headers, indent=2)}")
+    try:
+        claims = jws.get_unverified_claims(raw_data)
+        try:
+            print(f"[*] JWS Body: {json.dumps(json.loads(claims), indent=2)}")
+        except:
+            print(f"[*] JWS Body: {claims}")
     except:
-        pass
+        print(f"[*] Raw Body: {raw_data}")
 
     if not os.path.exists(PAYLOAD_FILE):
         body = {"statusCode": 404, "error": "No active transaction found"}
@@ -245,29 +307,21 @@ def receive_notification(payload_id):
         validate_against_spec(body, "SignedStatusCodePayload")
         return sign_jws(body, private_key_pem, incoming_headers.get("correlationId")), 404, {'Content-Type': 'application/jose'}
 
-    if raw_data.count('.') == 2:
-        try:
-            # Verify Signature using headers (x5c or certserv via x5u)
-            payload_bytes, _ = verify_jws(raw_data)
-            data = json.loads(payload_bytes.decode('utf-8'))
-            validate_against_spec(data, "NotificationPayload")
+    try:
+        # Verify Signature using headers (x5c or certserv via x5u)
+        payload_bytes, _ = verify_jws(raw_data)
+        data = json.loads(payload_bytes.decode('utf-8'))
+        validate_against_spec(data, "NotificationPayload")
 
-            print(f"\n[!] Payment Notification Received for ID: {payload_id}")
-            print(json.dumps(data, indent=2))
+        resp_body = {"statusCode": 200}
+        validate_against_spec(resp_body, "SignedStatusCodePayload")
+        signed_resp = sign_jws(resp_body, private_key_pem, incoming_headers.get("correlationId"))
+        return signed_resp, 200, {'Content-Type': 'application/jose'}
 
-            resp_body = {"statusCode": 200}
-            validate_against_spec(resp_body, "SignedStatusCodePayload")
-            signed_resp = sign_jws(resp_body, private_key_pem, incoming_headers.get("correlationId"))
-            return signed_resp, 200, {'Content-Type': 'application/jose'}
-
-        except Exception as e:
-            print(f"\n[!] Error processing JWS: {e}")
-            body = {"statusCode": 400, "error": "Invalid Request or Signature"}
-            return sign_jws(body, private_key_pem, incoming_headers.get("correlationId")), 400, {'Content-Type': 'application/jose'}
-
-    print(f"\n[!] Invalid Notification Format Received for ID: {payload_id}")
-    body = {"statusCode": 400, "error": "Invalid request format. Expected JWS."}
-    return sign_jws(body, private_key_pem), 400, {'Content-Type': 'application/jose'}
+    except Exception as e:
+        print(f"\n[!] Error processing JWS: {e}")
+        body = {"statusCode": 400, "error": "Invalid Request or Signature"}
+        return sign_jws(body, private_key_pem, incoming_headers.get("correlationId")), 400, {'Content-Type': 'application/jose'}
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="X9.150 Payee PSP Simulator")

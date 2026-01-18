@@ -3,12 +3,12 @@
         {
             "kty": "EC",
             "crv": "P-256",
-            "x": "fgAxhMQsZjYHHgXszACOTFY_FyMCzVV2kOfdt055nBo",
-            "y": "ISR94WutBBGook3dzZdxMm5SMiTjdIcxBht_B6iEHAA",
+            "x": "BcyQElTtROQ-3uKVQeQsevc-bonC2QIH19XNEPmtCH8",
+            "y": "bSKdxJf9lJvM7CIjj6_ayNcEfTykiAY5CfJwcLFcCXw",
             "use": "sig",
             "kid": "payer-key-id-001",
             "x5u": "http://127.0.0.1:5001/payer_cert.pem",
-            "x5t#S256": "Um_YNCAXCFjrHBPX0DC4ehfgKCUwGyp4V6XnlymNyso",
+            "x5t#S256": "4YzLeJoJaltaWsgYl7QuTjLQ25s7lkqWaqSOtkIslbo",
             "alg": "ES256"
         }
     ]

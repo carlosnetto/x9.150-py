@@ -1,12 +1,34 @@
 <!-- Developed in Jan 2026, author carlos.netto@gmail.com. -->
 <!-- Purpose: Validate the X9.150 specification. -->
 <!-- Not for production use; intended only to prove the spec. -->
+# X9.150 Secure Payment QR Code Demo
 
-# X9.150 QR Code Generator & Payee PSP Simulator (POC)
+This POC shows how the new **ANSI X9.150 QR code payment standard** can work securely in the real world. It proves how the X9 digital certificate can be leveraged to prevent fake or tampered QR codes, ensuring both sides of the transaction can trust each other.
 
-This repository contains a **Proof of Concept (POC)** and testing implementation of the **ANSI X9.150 QR Code Payments Standard**. It serves two main purposes:
-1. **QR Code Generation**: Creates an EMVCo-compliant Merchant Presented Mode QR Code (Section 5.2.2) that references a secure payment payload.
-2. **Payee PSP Simulation**: Runs a local server to handle the **Payment Payload Request** (Section 6.2) and the **Payment Notification** (Section 6.3).
+The main purpose of this Proof of Concept (POC) is to demonstrate that a bank or merchant can trust a QR code payment because the parties are cryptographically verified using digital certificates defined by the X9 standard.
+
+### The Problem It Solves
+One of the biggest concerns with QR code payments is: **“How do I know this QR code and this payment request are legitimate?”**
+
+This POC shows:
+*   **Payee Identity**: How the payee side proves its identity using an X9 digital certificate.
+*   **Payer Verification**: How the payer side can verify that the payment request is authentic and the details have not been altered.
+*   **Mutual Trust**: How the payee can verify that the payment confirmation really came from a trusted payment services provider.
+
+This creates a mutual trust model where both sides can verify each other before any money moves.
+
+### POC Explained
+The POC simulates a complete end-to-end flow:
+1.  **Merchant**: Generates a QR code for a payment.
+2.  **Customer**: Scans it with a bank app.
+3.  **Verification**: The bank app verifies the merchant’s identity using an X9 digital certificate and ensures payment details were not changed.
+4.  **Approval**: The customer approves the payment.
+5.  **Confirmation**: The merchant system verifies that the payment confirmation came from a trusted, certified party.
+
+This demonstrates **end-to-end identity, authenticity, and integrity**—not just a simple QR code.
+
+### Why This Matters
+This proves that QR code payments can be open, interoperable, and secure, and that the industry can have a shared trust framework based on X9 digital certificates.
 
 ## Features
 
@@ -31,7 +53,7 @@ pip install -r requirements.txt
 ## Usage
 
 ### 1. Generate Keys and Certificates
-First, generate the necessary ECC key pairs, self-signed certificates, Certificate Signing Requests (CSRs), and JWKS metadata for both the Payer and Payee.
+First, generate the necessary ECC key pairs, self-signed certificates, and JWKS metadata for both the Payer and Payee.
 
 ```bash
 python keygen.py

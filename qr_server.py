@@ -10,6 +10,7 @@ import os
 import hashlib
 import argparse
 import requests
+import random
 from flask import Flask, jsonify, request
 from jose import jws
 from cryptography import x509
@@ -33,10 +34,9 @@ payee_cert_b64 = None
 payer_public_key = None
 payee_thumbprint = None
 jwk_metadata = {}
-FAIL_CORRELATION_ID = False
-FAIL_IAT = False
-FAIL_TTL = False
 FAIL_SIGNATURE = False
+FAIL_CORRELATION_ID = False
+FAIL_JWS_CUSTOM = False
 
 def validate_against_spec(data, schema_name):
     """Validates JSON against the OpenAPI spec. Required for spec validation testing."""
@@ -120,25 +120,15 @@ def load_data():
     print(f"[*] Payee keys and JWKS metadata loaded.")
     return True
 
-def sign_jws(payload, key_pem, correlation_id=None):
+def sign_jws(payload, key_pem, correlation_id=None, is_fetch=False):
     """Wraps the payload in a JWS structure (used for responses)."""
     iat = int(time.time())
 
-    # Testing logic for iat and ttl failures
-    if FAIL_IAT:
-        print("[!] Testing Mode: Intentionally returning an old iat (11 mins ago).")
-        iat = iat - 660
+    ttl_val = (iat * 1000) + 60000 # 1 minute after iat
     
-    if FAIL_TTL:
-        print("[!] Testing Mode: Intentionally returning an expired ttl.")
-        iat = int(time.time()) - 120 # 2 minutes ago
-        ttl_val = (iat * 1000) + 60000 # 1 minute after iat (expired now)
-    else:
-        ttl_val = (iat * 1000) + 60000 # 1 minute after iat
-
-    # Logic for testing correlationId failure
     effective_correlation_id = correlation_id or str(uuid.uuid4())
-    if FAIL_CORRELATION_ID:
+
+    if is_fetch and FAIL_CORRELATION_ID:
         print("[!] Testing Mode: Intentionally returning a wrong correlationId.")
         effective_correlation_id = str(uuid.uuid4())
 
@@ -154,6 +144,17 @@ def sign_jws(payload, key_pem, correlation_id=None):
         "correlationId": effective_correlation_id,
         "crit": ["correlationId", "iat", "ttl"]
     }
+
+    if FAIL_JWS_CUSTOM:
+        fields = ["iat", "ttl", "correlationId"]
+        to_remove = []
+        while not to_remove:
+            to_remove = [f for f in fields if random.choice([True, False])]
+        
+        print(f"[!] Testing Mode: Intentionally omitting JWS headers in response: {to_remove}")
+        for field in to_remove:
+            if field in headers:
+                del headers[field]
 
     token = jws.sign(payload, key_pem, headers=headers, algorithm='ES256')
 
@@ -221,14 +222,14 @@ def fetch_payload(payload_id):
         incoming_headers = jws.get_unverified_header(raw_data)
     except Exception:
         body = {"statusCode": 400, "error": "Invalid JWS format"}
-        return sign_jws(body, private_key_pem), 400, {'Content-Type': 'application/jose'}
+        return sign_jws(body, private_key_pem, is_fetch=True), 400, {'Content-Type': 'application/jose'}
 
     # Validate JWS headers (including 'crit' enforcement)
     is_valid, error_msg = validate_jws_headers(incoming_headers)
     if not is_valid:
         print(f"[!] JWS Header Validation Error: {error_msg}")
         body = {"statusCode": 400, "error": error_msg}
-        return sign_jws(body, private_key_pem, incoming_headers.get("correlationId")), 400, {'Content-Type': 'application/jose'}
+        return sign_jws(body, private_key_pem, incoming_headers.get("correlationId"), is_fetch=True), 400, {'Content-Type': 'application/jose'}
 
     # Verify Signature
     try:
@@ -237,7 +238,7 @@ def fetch_payload(payload_id):
     except Exception as e:
         print(f"[!] Signature Verification Failed for Fetch: {e}")
         body = {"statusCode": 400, "error": "Invalid Signature"}
-        return sign_jws(body, private_key_pem, incoming_headers.get("correlationId")), 400, {'Content-Type': 'application/jose'}
+        return sign_jws(body, private_key_pem, incoming_headers.get("correlationId"), is_fetch=True), 400, {'Content-Type': 'application/jose'}
 
     print(f"\n[*] Incoming Fetch Request for ID: {payload_id}")
     print(f"[*] JWS Headers: {json.dumps(incoming_headers, indent=2)}")
@@ -249,7 +250,7 @@ def fetch_payload(payload_id):
     if not os.path.exists(PAYLOAD_FILE):
         body = {"statusCode": 404, "error": "Payload file not found"}
         validate_against_spec(body, "SignedStatusCodePayload")
-        signed_err = sign_jws(body, private_key_pem, incoming_headers.get("correlationId"))
+        signed_err = sign_jws(body, private_key_pem, incoming_headers.get("correlationId"), is_fetch=True)
         return signed_err, 404, {'Content-Type': 'application/jose'}
 
     with open(PAYLOAD_FILE, "r") as f:
@@ -259,11 +260,11 @@ def fetch_payload(payload_id):
         print(f"[!] ID mismatch: Requested {payload_id}, found {payload_data.get('id')}")
         body = {"statusCode": 404, "error": "Payload ID mismatch"}
         validate_against_spec(body, "SignedStatusCodePayload")
-        signed_err = sign_jws(body, private_key_pem, incoming_headers.get("correlationId"))
+        signed_err = sign_jws(body, private_key_pem, incoming_headers.get("correlationId"), is_fetch=True)
         return signed_err, 404, {'Content-Type': 'application/jose'}
 
     validate_against_spec(payload_data, "PaymentRequest")
-    signed_payload = sign_jws(payload_data, private_key_pem, incoming_headers.get("correlationId"))
+    signed_payload = sign_jws(payload_data, private_key_pem, incoming_headers.get("correlationId"), is_fetch=True)
     return signed_payload, 200, {'Content-Type': 'application/jose'}
 
 @app.route('/notify/<payload_id>', methods=['POST'])
@@ -325,19 +326,15 @@ def receive_notification(payload_id):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="X9.150 Payee PSP Simulator")
-    parser.add_argument("--failCorrelationId", action="store_true", help="Intentionally return a wrong correlationId in JWS headers for testing.")
-    parser.add_argument("--failiat", action="store_true", help="Intentionally return an old iat (11 mins ago) for testing.")
-    parser.add_argument("--failttl", action="store_true", help="Intentionally return an expired ttl for testing.")
     parser.add_argument("--failSignature", action="store_true", help="Intentionally corrupt the JWS signature for testing.")
+    parser.add_argument("--failCorrelationId", action="store_true", help="Intentionally return a wrong correlationId in the /fetch response.")
+    parser.add_argument("--failjwscustom", action="store_true", help="Intentionally omit mandatory JWS headers (iat, ttl, correlationId) randomly in responses.")
     args = parser.parse_args()
 
-    FAIL_CORRELATION_ID = args.failCorrelationId
-    FAIL_IAT = args.failiat
-    FAIL_TTL = args.failttl
     FAIL_SIGNATURE = args.failSignature
+    FAIL_CORRELATION_ID = args.failCorrelationId
+    FAIL_JWS_CUSTOM = args.failjwscustom
 
     if load_data():
         print(f"[*] Starting Payee Server at http://{HOST}:{PORT}...")
-        if FAIL_CORRELATION_ID:
-            print("[!] WARNING: Server is running with --failCorrelationId. All responses will have mismatched correlation IDs.")
         app.run(host=HOST, port=PORT, debug=False, use_reloader=False)

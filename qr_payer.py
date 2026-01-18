@@ -305,24 +305,44 @@ def verify_jws(token):
         return payload, header
     raise ValueError("No certificate found in JWS headers")
 
-def validate_jws_headers(header):
-    """Validates iat and ttl in JWS headers for security and spec compliance."""
+def validate_jws_headers(header, expected_correlation_id=None):
+    """Validates iat, ttl, correlationId, and crit list in JWS headers."""
+    # 1. Check 'crit' enforcement (RFC 7515)
+    crit = header.get("crit", [])
+    if not isinstance(crit, list):
+        crit = []
+        
+    for field in crit:
+        if field not in header:
+            print(f"[!] Security Error: Critical header '{field}' is missing from response.")
+            return False
+
+    # 2. Validate correlationId (Non-repudiation)
+    if expected_correlation_id:
+        received_id = header.get("correlationId")
+        if received_id != expected_correlation_id:
+            print(f"[!] Security Error: correlationId mismatch! Expected {expected_correlation_id}, got {received_id}")
+            return False
+
+    # 3. Validate iat (Issued At)
     now = int(time.time())
     iat = header.get("iat")
     if iat:
-        if iat > now:
+        if iat > now + 60: # 1 minute clock skew allowance
             print("[!] Security Error: iat is in the future!")
             return False
         if now - iat > 300: # 5 minutes threshold
             print(f"[!] Security Error: iat is too old ({now - iat} seconds ago)!")
             return False
     
+    # 4. Validate ttl (Time To Live)
     ttl = header.get("ttl")
     if ttl:
         now_ms = int(time.time() * 1000)
         if now_ms > ttl:
             print(f"[!] Security Error: JWS has expired (ttl: {ttl}, current: {now_ms})!")
             return False
+            
     return True
 
 def sign_jws_with_fail_logic(payload, private_key_pem, headers):
@@ -450,13 +470,8 @@ def run_payer(fail_sig=False, fail_jws_custom=False):
             # Verify the server's signature (uses x5c or certserv via x5u)
             payload_bytes, resp_header = verify_jws(response.text)
             
-            # Validate security headers
-            if not validate_jws_headers(resp_header):
-                return
-
-            # Validate correlationId echo for non-repudiation
-            if resp_header.get("correlationId") != correlation_id:
-                print(f"[!] Security Error: correlationId mismatch! Expected {correlation_id}, got {resp_header.get('correlationId')}")
+            # Validate security headers and correlationId
+            if not validate_jws_headers(resp_header, expected_correlation_id=correlation_id):
                 return
 
             payload_json = json.loads(payload_bytes.decode('utf-8'))
@@ -519,7 +534,7 @@ def run_payer(fail_sig=False, fail_jws_custom=False):
                         }
                         validate_against_spec(notification_payload, "NotificationPayload")
 
-                        signed_init_notification = sign_jws_with_fail_logic(notification_payload, private_key_pem, headers)
+                        signed_init_notification = jws.sign(notification_payload, private_key_pem, headers=headers, algorithm='ES256')
                         
                         notify_url = payload_json.get("paymentNotification")
                         init_resp = requests.post(notify_url, data=signed_init_notification, headers={'Content-Type': 'application/jose'})
@@ -527,11 +542,7 @@ def run_payer(fail_sig=False, fail_jws_custom=False):
                         if init_resp.status_code == 200:
                             init_payload_bytes, init_resp_header = verify_jws(init_resp.text)
                             
-                            if not validate_jws_headers(init_resp_header):
-                                return
-
-                            if init_resp_header.get("correlationId") != correlation_id:
-                                print(f"[!] Security Error: correlationId mismatch in init notification! Expected {correlation_id}")
+                            if not validate_jws_headers(init_resp_header, expected_correlation_id=correlation_id):
                                 return
 
                             init_resp_data = json.loads(init_payload_bytes.decode('utf-8'))
@@ -546,16 +557,12 @@ def run_payer(fail_sig=False, fail_jws_custom=False):
                             notification_payload["payment"]["transactionId"] = tx_hash
                             validate_against_spec(notification_payload, "NotificationPayload")
                             
-                            signed_final_notification = sign_jws_with_fail_logic(notification_payload, private_key_pem, headers)
+                            signed_final_notification = jws.sign(notification_payload, private_key_pem, headers=headers, algorithm='ES256')
                             final_resp = requests.post(notify_url, data=signed_final_notification, headers={'Content-Type': 'application/jose'})
                             if final_resp.status_code == 200:
                                 final_payload_bytes, final_resp_header = verify_jws(final_resp.text)
                                 
-                                if not validate_jws_headers(final_resp_header):
-                                    return
-
-                                if final_resp_header.get("correlationId") != correlation_id:
-                                    print(f"[!] Security Error: correlationId mismatch in final notification! Expected {correlation_id}")
+                                if not validate_jws_headers(final_resp_header, expected_correlation_id=correlation_id):
                                     return
 
                                 final_resp_data = json.loads(final_payload_bytes.decode('utf-8'))

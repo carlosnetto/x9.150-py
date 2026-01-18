@@ -1,3 +1,7 @@
+# Developed in Jan 2026, author carlos.netto@gmail.com.
+# Purpose: Validate the X9.150 specification.
+# Not for production use; intended only to prove the spec.
+
 import base64
 import json
 import os
@@ -14,7 +18,9 @@ from cryptography.hazmat.primitives.asymmetric import ec
 from web3 import Web3
 from eth_account import Account
 import yaml
-from jsonschema import validate, RefResolver
+from jsonschema import Draft7Validator
+import referencing
+from referencing.jsonschema import DRAFT7
 
 # --- CONFIGURATION ---
 QR_TEXT_FILE = "qrcode.txt"
@@ -40,10 +46,17 @@ def validate_against_spec(data, schema_name):
         return
     with open(spec_path, 'r') as f:
         spec = yaml.safe_load(f)
-    schema = spec['components']['schemas'][schema_name]
-    resolver = RefResolver(f"file://{os.path.abspath(spec_path)}", spec)
+
+    # Define a base URI for the spec to allow proper $ref resolution across the registry
+    spec_uri = "http://x9.150/openapi.yaml"
+    target_schema = {"$ref": f"{spec_uri}#/components/schemas/{schema_name}"}
+
+    # Create a registry from the full spec to resolve internal $refs
+    resource = referencing.Resource.from_contents(spec, default_specification=DRAFT7)
+    registry = referencing.Registry().with_resource(uri=spec_uri, resource=resource)
+
     try:
-        validate(instance=data, schema=schema, resolver=resolver)
+        Draft7Validator(target_schema, registry=registry).validate(data)
         print(f"[OK] JSON validated against {schema_name}")
     except Exception as e:
         print(f"[!] Spec Validation Error ({schema_name}): {e}")

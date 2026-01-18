@@ -1,3 +1,7 @@
+# Developed in Jan 2026, author carlos.netto@gmail.com.
+# Purpose: Validate the X9.150 specification.
+# Not for production use; intended only to prove the spec.
+
 import os
 from flask import Flask, send_from_directory, abort
 

@@ -1,3 +1,7 @@
+<!-- Developed in Jan 2026, author carlos.netto@gmail.com. -->
+<!-- Purpose: Validate the X9.150 specification. -->
+<!-- Not for production use; intended only to prove the spec. -->
+
 # X9.150 QR Code Generator & Payee PSP Simulator (POC)
 
 This repository contains a **Proof of Concept (POC)** and testing implementation of the **ANSI X9.150 QR Code Payments Standard**. It serves two main purposes:

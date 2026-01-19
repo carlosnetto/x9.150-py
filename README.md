@@ -21,9 +21,12 @@ This creates a mutual trust model where both sides can verify each other before 
 The POC simulates a complete end-to-end flow:
 1.  **Merchant**: Generates a QR code for a payment.
 2.  **Customer**: Scans it with a bank app.
-3.  **Verification**: The bank app verifies the merchant’s identity using an X9 digital certificate and ensures payment details were not changed.
-4.  **Approval**: The customer approves the payment.
-5.  **Confirmation**: The merchant system verifies that the payment confirmation came from a trusted, certified party.
+3.  **Secure Retrieval**: The bank app sends a **digitally signed request** to fetch the payment details. The merchant server verifies the requester's digital certificate before returning the JSON payload, ensuring that unauthorized third parties cannot retrieve sensitive transaction data.
+4.  **Verification**: The bank app verifies the merchant’s identity using an X9 digital certificate and ensures payment details were not changed.
+5.  **Approval**: The customer approves the payment.
+6.  **Confirmation**: The merchant system verifies that the payment confirmation came from a trusted, certified party.
+
+*Note: In this POC, while we enforce certificate-based authentication for all participants, we are not strictly validating the root CA against a formal X9 hierarchy; we use a simulated PKI environment to demonstrate the protocol logic.*
 
 This demonstrates **end-to-end identity, authenticity, and integrity**—not just a simple QR code.
 

@@ -29,5 +29,5 @@ def serve_static_file(filename):
     return send_from_directory(BASE_DIR, filename)
 
 if __name__ == '__main__':
-    # Port 5001 as requested to avoid conflict with qr_server (port 5000)
+    # Port 5001 as requested to avoid conflict with qr_server (port 5005)
     app.run(host='127.0.0.1', port=5001)

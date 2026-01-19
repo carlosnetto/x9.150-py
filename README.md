@@ -107,6 +107,23 @@ This generates `openapi_flattened.csv`, providing a flattened view of all JSON p
 
 ## How It Works
 
+### Technical Component Breakdown
+To understand the implementation, follow these files in order to see how the X9.150 trust chain is built:
+
+1.  **`keygen.py` (The Trust Setup)**: Generates Elliptic Curve (ECC) keys and X.509 certificates. In X9.150, identity is bound to these certificates. This simulates the enrollment of a Merchant or Bank into the payment network.
+2.  **`certserv.py` (The Certificate Repository)**: Hosts public certificates and JWKS metadata. When a Payer receives a signed message, they use the `x5u` (X.509 URL) header to fetch the certificate from this server to verify the signature.
+3.  **`qr_generator.py` (The Merchant POS)**: Creates the EMVCo-compliant QR string. Instead of just encoding a price, it encodes a secure, unique URL pointing to the `qr_server.py`.
+4.  **`qr_server.py` (The Payee Backend)**: The core logic. It manages the `/fetch/` endpoint (delivering the signed payment payload) and the `/notify/` endpoint (receiving and verifying the payment confirmation).
+5.  **`qr_payer.py` (The Wallet Simulator)**: Simulates the consumer's banking app. It performs the critical "Verification" step: checking the Merchant's JWS signature and validating the certificate before showing the "Pay" button to the user.
+
+### The Security Handshake (JWS)
+The security of X9.150 relies on **JSON Web Signatures (JWS)**. Every exchange follows this pattern:
+*   **Protected Header**: Tells the receiver which certificate to use (`x5u` or `x5c`) and the algorithm (`ES256`).
+*   **Payload**: The actual transaction data (Amount, Currency, Merchant ID).
+*   **Signature**: A cryptographic seal. If even one character in the payload is changed (e.g., changing $10.00 to $100.00), the signature verification will fail.
+
+---
+
 1.  **Startup**: The script generates an ECC key pair (simulating the Payee PSP's keys).
 2.  **QR Generation**: It creates a unique Transaction ID and embeds the URL (`https://<domain>/fetch/<id>`) into the EMV QR string.
 3.  **Image Creation**: Saves the QR code as `qrcode.png`.

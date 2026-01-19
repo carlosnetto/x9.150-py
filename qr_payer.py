@@ -29,6 +29,8 @@ FAIL_JWS_CUSTOM = False
 
 def parse_emv_tlv(data):
     """Helper to parse EMV TLV format."""
+    # EMV QR codes are strings of Tag (2 chars), Length (2 chars), and Value.
+    # Example: '000201' -> Tag 00, Length 02, Value '01'
     results = {}
     i = 0
     while i < len(data):
@@ -105,6 +107,10 @@ def load_payer_identity():
 
 def display_payload(payload):
     """Prints the X9.150 payload in a human-readable format."""
+    # This simulates the "Review Payment" screen in a banking app.
+    # It shows the Merchant name, the amount, and any adjustments (like tips or fees)
+    # retrieved from the secure X9.150 JSON payload.
+    
     # 1. Basic QR Elements
     print("\n" + "="*60)
     print("QR CODE BASIC ELEMENTS")
@@ -227,6 +233,8 @@ def display_payload(payload):
 
 def pay_usdc_on_base(mnemonic, recipient_address, amount_to_pay):
     """Connects to Base and sends the specified amount of USDC."""
+    # This is a real blockchain transaction. It uses the Web3 library to 
+    # move USDC tokens on the Base (Layer 2) network.
     # Base Mainnet RPC
     w3 = Web3(Web3.HTTPProvider("https://mainnet.base.org"))
     
@@ -389,6 +397,11 @@ def log_server_error(resp):
 def run_payer(fail_sig=False, fail_jws_custom=False, fail_iat=False, fail_ttl=False):
     global FAIL_SIGNATURE
     FAIL_SIGNATURE = fail_sig
+    # The Payer (Wallet) flow:
+    # 1. Scan QR -> 2. Extract URL -> 3. POST to /fetch (Signed) 
+    # 4. Receive Payload -> 5. Verify Merchant Signature -> 6. User Approves
+    # 7. Execute Blockchain Tx -> 8. POST to /notify (Signed)
+    
     global FAIL_JWS_CUSTOM
     FAIL_JWS_CUSTOM = fail_jws_custom
 
@@ -474,7 +487,8 @@ def run_payer(fail_sig=False, fail_jws_custom=False, fail_iat=False, fail_ttl=Fa
         print(f"[*] Server Response Status: {response.status_code}")
         
         if response.status_code == 200:
-            # Verify the server's signature (uses x5c or certserv via x5u)
+            # CRITICAL SECURITY STEP: Verify that the response actually came 
+            # from the Merchant/Payee and hasn't been tampered with.
             payload_bytes, resp_header = verify_jws(response.text)
             
             # Validate security headers and correlationId
@@ -526,6 +540,8 @@ def run_payer(fail_sig=False, fail_jws_custom=False, fail_iat=False, fail_ttl=Fa
                     payer_addr = account.address
 
                     # --- Step 1: Initial Payment Notification (Initiation) ---
+                    # We tell the Merchant we are starting the payment so they can 
+                    # lock the QR code and prevent someone else from paying it.
                     print("[*] Initiating payment (Status: PAYMENT_INITIATED)...")
                     notification_payload = {
                         "id": payload_json.get("id"),
@@ -562,6 +578,8 @@ def run_payer(fail_sig=False, fail_jws_custom=False, fail_iat=False, fail_ttl=Fa
                             
                             # --- Blockchain Payment Step ---
                             tx_hash, _ = pay_usdc_on_base(mnemonic, usdc_base_address, test_amount)
+                            # Once the blockchain transaction is submitted, we have a 
+                            # transaction hash (tx_hash) as proof.
 
                             if tx_hash:
                                 # --- Step 2: Final Payment Notification (Completion) ---

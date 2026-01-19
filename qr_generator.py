@@ -55,6 +55,8 @@ CURRENCY_TO_NUMERIC = {
 
 def calculate_crc(data_string):
     """Calculates the CRC-16/CCITT-FALSE (0xFFFF, 0x1021) for EMV QR."""
+    # EMVCo requires a 4-character checksum at the end of the QR string 
+    # to ensure the data wasn't corrupted during the scan.
     crc = 0xFFFF
     polynomial = 0x1021
     data_bytes = data_string.encode('utf-8')
@@ -71,6 +73,10 @@ def calculate_crc(data_string):
 
 def format_emv_qr(url, template):
     """Constructs the EMVCo Merchant Presented Mode QR Content String."""
+    # EMVCo uses a Tag-Length-Value (TLV) format.
+    # Tag 00: Payload Format Indicator
+    # Tag 26: Merchant Account Information (Where the X9.150 URL lives)
+    # Tag 63: CRC (Checksum)
     # Note: url shall adhere to the syntax dictated by RFC 3986.
     def tlv(tag, value):
         return f"{tag}{len(value):02}{value}"
@@ -106,6 +112,10 @@ def format_emv_qr(url, template):
 
 def create_payment_payload(template, qr_content_string, payload_id, base_url):
     """Merges Template with System Generated Fields."""
+    # This function builds the 'PaymentRequest' JSON object defined in X9.150.
+    # It includes the Merchant's details, the amount, and the 'paymentNotification' 
+    # URL where the Payer will send the confirmation.
+    
     now = datetime.now(timezone.utc)
     now_str = now.strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
     valid_until = (now + timedelta(minutes=15)).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'

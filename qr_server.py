@@ -125,6 +125,11 @@ def load_data():
 
 def sign_jws(payload, key_pem, correlation_id=None, is_fetch=False):
     """Wraps the payload in a JWS structure (used for responses)."""
+    # JWS (JSON Web Signature) consists of three parts: Header.Payload.Signature
+    # The Header contains metadata (who signed it, what algorithm).
+    # The Payload is the actual data (the payment details).
+    # The Signature is the cryptographic proof of authenticity.
+
     iat = int(time.time())
     if FAIL_IAT:
         print("[!] Testing Mode: Intentionally returning an iat from 11 minutes ago.")
@@ -142,14 +147,15 @@ def sign_jws(payload, key_pem, correlation_id=None, is_fetch=False):
         effective_correlation_id = str(uuid.uuid4())
 
     headers = {
-        "alg": "ES256",
-        "typ": "payresp+jws",
+        "alg": "ES256", # ECDSA using P-256 and SHA-256
+        "typ": "payresp+jws", # X9.150 specific type for payment responses
         "x5c": [payee_cert_b64],  # Embeds the cert directly to avoid HTTP hits
         "x5u": jwk_metadata.get("x5u"), # Kept as a standard fallback
         "x5t#S256": payee_thumbprint,
         "kid": jwk_metadata.get("kid"),
-        "iat": iat,
-        "ttl": ttl_val,
+        "iat": iat, # Issued At: Prevents replay attacks
+        "ttl": ttl_val, # Time To Live: Ensures the message is fresh
+        # correlationId: Links the response to the original request for non-repudiation
         "correlationId": effective_correlation_id,
         "crit": ["correlationId", "iat", "ttl"]
     }
@@ -180,13 +186,15 @@ def sign_jws(payload, key_pem, correlation_id=None, is_fetch=False):
 def verify_jws(token):
     """Verifies a JWS using x5c (embedded) or x5u (remote via certserv)."""
     header = jws.get_unverified_header(token)
-    # 1. Try x5c (Embedded - High Performance)
+    
+    # 1. Try x5c (Embedded Certificate)
+    # This is faster because we don't need to make an extra network call.
     if 'x5c' in header:
         cert_der = base64.b64decode(header['x5c'][0])
         cert = x509.load_der_x509_certificate(cert_der)
         payload = jws.verify(token, cert.public_key(), algorithms=['ES256'])
         return payload, header
-    # 2. Try x5u (URL - uses certserv.py)
+    # 2. Try x5u (Certificate URL)
     if 'x5u' in header:
         r = requests.get(header['x5u'])
         cert = x509.load_pem_x509_certificate(r.content)
@@ -197,6 +205,8 @@ def verify_jws(token):
 def validate_jws_headers(header):
     """Validates iat, ttl, and crit list in JWS headers for security and spec compliance."""
     # 1. Check 'crit' enforcement (RFC 7515)
+    # The 'crit' header lists fields that the receiver MUST understand and validate.
+    # If a receiver sees a field in 'crit' that it doesn't support, it must reject the JWS.
     crit = header.get("crit", [])
     if not isinstance(crit, list):
         crit = []
@@ -226,6 +236,8 @@ def validate_jws_headers(header):
 @app.route('/fetch/<payload_id>', methods=['POST'])
 def fetch_payload(payload_id):
     """Endpoint for Payer App to retrieve the Payment Payload (Section 6.2)."""
+    # This is the first step after scanning. The Payer app asks: 
+    # "I scanned this QR, what are the payment details?"
     raw_data = request.get_data(as_text=True).strip()
     try:
         incoming_headers = jws.get_unverified_header(raw_data)
@@ -279,6 +291,8 @@ def fetch_payload(payload_id):
 @app.route('/notify/<payload_id>', methods=['POST'])
 def receive_notification(payload_id):
     """Endpoint for Payer PSP to send Payment Notification (Section 6.3)."""
+    # This is the final step. The Payer app says: 
+    # "I have sent the money, here is the transaction hash/proof."
     raw_data = request.get_data(as_text=True).strip()
     try:
         incoming_headers = jws.get_unverified_header(raw_data)

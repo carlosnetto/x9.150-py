@@ -15,6 +15,9 @@ def serve_static_file(filename):
     """
     Serves files from the local directory.
     Specifically intended for .pem (certificates) and .jwks files.
+    
+    In X9.150, the 'x5u' header in a JWS points to a URL like this. 
+    The Payer app downloads the certificate from here to verify the Merchant's signature.
     """
     # Security check: Only allow serving specific extensions
     allowed_extensions = {'.pem', '.jwks'}

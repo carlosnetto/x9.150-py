@@ -1,6 +1,6 @@
 {
     "creditor": {
-        "name": "Fresh Market",
+        "name": "Fresh Market with a name longer than 25 characters",
         "phone": "+13055550009",
         "email": "contact@freshmarket.com",
         "address": {

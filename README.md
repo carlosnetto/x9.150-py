@@ -133,7 +133,7 @@ You can simulate the Payer PSP using `curl` against the specific endpoints.
 # Replace <URL> with the URL printed by the script
 curl -X POST <URL> \
      -H "Content-Type: application/jose" \
-     -d 'eyJhbGciOiJFUzI1NiJ9.eyJxckNvZGVDb250ZW50IjoiLi4uIn0.signature'
+     -d '<header>.<payload-with-qrCodeContent-example-invalid>.<signature>'
 ```
 
 **2. Send a Payment Notification:**
@@ -143,7 +143,7 @@ curl -X POST <URL> \
 # Replace <URL> with the URL printed by the script
 curl -X POST <URL> \
      -H "Content-Type: application/jose" \
-     -d 'eyJhbGciOiJFUzI1NiJ9.eyJwYXltZW50Ijp7ImFtb3VudCI6NDUwMCwiY3VycmVuY3kiOiJVU0QifX0.signature'
+     -d '<header>.<payload-with-qrCodeContent-example-invalid>.<signature>'
 ```
 
 *Note: The script currently accepts unverified JWS extraction for the purpose of determining the request type in this simulation, but enforces signature verification for the final processing of notifications.*

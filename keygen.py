@@ -97,7 +97,7 @@ def generate_key_pair(name, cert_url_base):
 
 if __name__ == "__main__":
     # Arbitrary local URL for the certificate server
-    BASE_URL = "http://127.0.0.1:5001"
+    BASE_URL = "http://localhost:5001"
     
     generate_key_pair("payee", BASE_URL)
     generate_key_pair("payer", BASE_URL)

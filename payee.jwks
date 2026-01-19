@@ -3,12 +3,12 @@
         {
             "kty": "EC",
             "crv": "P-256",
-            "x": "Ihgoxja-bzTRCkYTWS6Np-zvDhZeraDMqIEwxnR1d3M",
-            "y": "cE37RVL8-4hcHTpvgS21O6shkbZ1sVksJSiVU1T7yag",
+            "x": "QwGoSglrI65hi4Z8U7qbJTSi0miKJLxAtPbkQt3F5_k",
+            "y": "-4T98T0YmtdaNEKLrsELLz7CroMebtimjRKIlffN0nc",
             "use": "sig",
             "kid": "payee-key-id-001",
-            "x5u": "http://127.0.0.1:5001/payee_cert.pem",
-            "x5t#S256": "A39thYM1wHm-lMVADs-1gYMiO7gG2GS6JKf7r_hyQLY",
+            "x5u": "http://localhost:5001/payee_cert.pem",
+            "x5t#S256": "W-GzWGJJICYwER3CRvrVacgNzUEPXOgOYLDHCQppaKk",
             "alg": "ES256"
         }
     ]

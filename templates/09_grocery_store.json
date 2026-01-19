@@ -20,7 +20,7 @@
             "date": "2026-01-16"
         },
         "amountDue": {
-            "amount": 8420,
+            "amount": 842,
             "currency": "USD"
         },
         "tip": {
@@ -30,7 +30,7 @@
     "paymentMethods": [
         {
             "currency": "USD",
-            "amount": 8420,
+            "amount": 842,
             "networks": {
                 "FedNow": {
                     "routingNumber": "123456789",
@@ -46,7 +46,7 @@
         },
         {
             "currency": "USDC",
-            "amount": 84200000,
+            "amount": 8420000,
             "networks": {
                 "Base": {
                     "address": "0xa6d0AeFeB0427E0011003BFD8486f7b12b8C2ceb"

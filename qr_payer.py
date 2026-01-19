@@ -519,66 +519,71 @@ def run_payer(fail_sig=False, fail_jws_custom=False, fail_iat=False, fail_ttl=Fa
                     # Dividing the requested amount by 100 for testing purposes 
                     # to reduce actual cost while validating the flow.
                     test_amount = int(usdc_amount / 100)
-                    tx_hash, payer_addr = pay_usdc_on_base(mnemonic, usdc_base_address, test_amount)
 
-                    if tx_hash:
-                        # --- Step 1: Initial Payment Notification (Initiation) ---
-                        print("[*] Initiating payment (Status: PAYMENT_INITIATED)...")
-                        notification_payload = {
-                            "id": payload_json.get("id"),
-                            "payment": {
-                                "amount": test_amount,
-                                "currency": "USDC",
-                                "network": "BASE",
-                                "paymentTiming": payload_json.get("bill", {}).get("paymentTiming")
-                                # transactionId omitted for initiation
-                            },
-                            "payer": {
-                                "info": payer_addr,
-                                "fromAddress": payer_addr
-                            },
-                            "expectedDate": datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
-                        }
-                        validate_against_spec(notification_payload, "NotificationPayload")
+                    # Derive address for notification
+                    Account.enable_unaudited_hdwallet_features()
+                    account = Account.from_mnemonic(mnemonic)
+                    payer_addr = account.address
 
-                        signed_init_notification = jws.sign(notification_payload, private_key_pem, headers=headers, algorithm='ES256')
+                    # --- Step 1: Initial Payment Notification (Initiation) ---
+                    print("[*] Initiating payment (Status: PAYMENT_INITIATED)...")
+                    notification_payload = {
+                        "id": payload_json.get("id"),
+                        "payment": {
+                            "amount": test_amount,
+                            "currency": "USDC",
+                            "network": "BASE",
+                            "paymentTiming": payload_json.get("bill", {}).get("paymentTiming")
+                            # transactionId omitted for initiation
+                        },
+                        "payer": {
+                            "info": payer_addr,
+                            "fromAddress": payer_addr
+                        },
+                        "expectedDate": datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
+                    }
+                    validate_against_spec(notification_payload, "NotificationPayload")
+
+                    signed_init_notification = jws.sign(notification_payload, private_key_pem, headers=headers, algorithm='ES256')
+                    
+                    notify_url = payload_json.get("paymentNotification")
+                    init_resp = requests.post(notify_url, data=signed_init_notification, headers={'Content-Type': 'application/jose'})
+
+                    if init_resp.status_code == 200:
+                        init_payload_bytes, init_resp_header = verify_jws(init_resp.text)
                         
-                        notify_url = payload_json.get("paymentNotification")
-                        init_resp = requests.post(notify_url, data=signed_init_notification, headers={'Content-Type': 'application/jose'})
+                        if not validate_jws_headers(init_resp_header, expected_correlation_id=correlation_id):
+                            return
 
-                        if init_resp.status_code == 200:
-                            init_payload_bytes, init_resp_header = verify_jws(init_resp.text)
+                        init_resp_data = json.loads(init_payload_bytes.decode('utf-8'))
+                        validate_against_spec(init_resp_data, "SignedStatusCodePayload")
+                        if init_resp_data.get("statusCode") == 200:
+                            print("[*] Payee will accept the payment and the qr code is locked to avoid duplicated payment.")
                             
-                            if not validate_jws_headers(init_resp_header, expected_correlation_id=correlation_id):
-                                return
+                            # --- Blockchain Payment Step ---
+                            tx_hash, _ = pay_usdc_on_base(mnemonic, usdc_base_address, test_amount)
 
-                            init_resp_data = json.loads(init_payload_bytes.decode('utf-8'))
-                            validate_against_spec(init_resp_data, "SignedStatusCodePayload")
-                            if init_resp_data.get("statusCode") == 200:
-                                print("[*] Payee will accept the payment and the qr code is locked to avoid duplicated payment.")
-                            
-                            # --- Step 2: Final Payment Notification (Completion) ---
-                            # We reuse the tx_hash from the initial successful payment.
-                            # The previous logic incorrectly attempted a second transaction.
-                            print("[*] Sending final notification (Status: PAID) with transaction hash...")
-                            notification_payload["payment"]["transactionId"] = tx_hash
-                            validate_against_spec(notification_payload, "NotificationPayload")
-                            
-                            signed_final_notification = jws.sign(notification_payload, private_key_pem, headers=headers, algorithm='ES256')
-                            final_resp = requests.post(notify_url, data=signed_final_notification, headers={'Content-Type': 'application/jose'})
-                            if final_resp.status_code == 200:
-                                final_payload_bytes, final_resp_header = verify_jws(final_resp.text)
+                            if tx_hash:
+                                # --- Step 2: Final Payment Notification (Completion) ---
+                                print("[*] Sending final notification (Status: PAID) with transaction hash...")
+                                notification_payload["payment"]["transactionId"] = tx_hash
+                                validate_against_spec(notification_payload, "NotificationPayload")
                                 
-                                if not validate_jws_headers(final_resp_header, expected_correlation_id=correlation_id):
-                                    return
+                                signed_final_notification = jws.sign(notification_payload, private_key_pem, headers=headers, algorithm='ES256')
+                                final_resp = requests.post(notify_url, data=signed_final_notification, headers={'Content-Type': 'application/jose'})
+                                if final_resp.status_code == 200:
+                                    final_payload_bytes, final_resp_header = verify_jws(final_resp.text)
+                                    
+                                    if not validate_jws_headers(final_resp_header, expected_correlation_id=correlation_id):
+                                        return
 
-                                final_resp_data = json.loads(final_payload_bytes.decode('utf-8'))
-                                validate_against_spec(final_resp_data, "SignedStatusCodePayload")
-                                if final_resp_data.get("statusCode") == 200:
-                                    print("[*] Final confirmation received and verified.")
-                        else:
-                            print(f"[!] Payee initiation failed (Status {init_resp.status_code}):")
-                            log_server_error(init_resp)
+                                    final_resp_data = json.loads(final_payload_bytes.decode('utf-8'))
+                                    validate_against_spec(final_resp_data, "SignedStatusCodePayload")
+                                    if final_resp_data.get("statusCode") == 200:
+                                        print("[*] Final confirmation received and verified.")
+                    else:
+                        print(f"[!] Payee initiation failed (Status {init_resp.status_code}):")
+                        log_server_error(init_resp)
                 else:
                     print(f"\n[!] USDC method available but {wallet_file} not found.")
         else:

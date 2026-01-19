@@ -94,6 +94,7 @@ The Payee Server (`qr_server.py`) and Payer Simulator (`qr_payer.py`) support sp
 *   `--failttl`: When enabled, the server will return a JWS that is already expired based on the `ttl` (Time To Live) header.
 *   `--failSignature`: When enabled, the component will intentionally corrupt the JWS signature (simulating a calculation error) to test the recipient's signature verification logic.
 *   `--failjwscustom`: (Payer only) Randomly omits one or more mandatory JWS headers (`iat`, `ttl`, `correlationId`) to test server-side validation of critical headers.
+*   `--sanctionedWallet`: (Server only) Specifies a blockchain address to block. If a payment notification is received from this address, the server returns a 403 error, simulating a sanctions hit.
 
 ### Specification Documentation
 

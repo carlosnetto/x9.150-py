@@ -16,8 +16,8 @@ import referencing
 from referencing.jsonschema import DRAFT7
 
 # --- CONFIGURATION ---
-PORT = 5000
-HOST = "127.0.0.1"
+PORT = 5005
+HOST = "localhost"
 BASE_URL = f"http://{HOST}:{PORT}"
 QR_TEXT_FILE = "qrcode.txt"
 QR_IMAGE_FILE = "qrcode.png"

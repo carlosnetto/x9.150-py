@@ -47,7 +47,8 @@ components:
           type: string
           format: uri
           maxLength: 256
-          pattern: '^https?://(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}(?::\d+)?(?:/[^\s]*)?$'
+          # The X9.150 spec enforces https, but http is allowed for localhost for testing purposes.
+          pattern: '^(?:https://(?:localhost|(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,})|http://localhost)(?::\d+)?(?:/[^\s]*)?$'
           description: "The URL (webhook) where the payer's PSP sends status updates (e.g., PAYMENT_INITIATED, PAID). Shall adhere to the syntax dictated by RFC 3986."
         creditor:
           $ref: '#/components/schemas/Creditor'

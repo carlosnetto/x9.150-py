@@ -22,8 +22,8 @@ import referencing
 from referencing.jsonschema import DRAFT7
 
 # --- CONFIGURATION ---
-PORT = 5000
-HOST = "127.0.0.1"
+PORT = 5005
+HOST = "localhost"
 PAYLOAD_FILE = "payload.json"
 
 app = Flask(__name__)
@@ -39,6 +39,7 @@ FAIL_CORRELATION_ID = False
 FAIL_JWS_CUSTOM = False
 FAIL_IAT = False
 FAIL_TTL = False
+SANCTIONED_WALLET = None
 
 def validate_against_spec(data, schema_name):
     """Validates JSON against the OpenAPI spec. Required for spec validation testing."""
@@ -322,6 +323,13 @@ def receive_notification(payload_id):
         data = json.loads(payload_bytes.decode('utf-8'))
         validate_against_spec(data, "NotificationPayload")
 
+        if SANCTIONED_WALLET:
+            payer_addr = data.get("payer", {}).get("fromAddress")
+            if payer_addr and str(payer_addr).lower() == SANCTIONED_WALLET.lower():
+                print(f"[!] Security Alert: Payment blocked from sanctioned wallet {payer_addr}")
+                body = {"statusCode": 403, "error": "Sanctioned wallet"}
+                return sign_jws(body, private_key_pem, incoming_headers.get("correlationId")), 403, {'Content-Type': 'application/jose'}
+
         resp_body = {"statusCode": 200}
         validate_against_spec(resp_body, "SignedStatusCodePayload")
         signed_resp = sign_jws(resp_body, private_key_pem, incoming_headers.get("correlationId"))
@@ -339,6 +347,7 @@ if __name__ == "__main__":
     parser.add_argument("--failjwscustom", action="store_true", help="Intentionally omit mandatory JWS headers (iat, ttl, correlationId) randomly in responses.")
     parser.add_argument("--failiat", action="store_true", help="Intentionally return an iat from 11 minutes ago.")
     parser.add_argument("--failttl", action="store_true", help="Intentionally return an expired ttl.")
+    parser.add_argument("--sanctionedWallet", help="Blockchain address to sanction/block.")
     args = parser.parse_args()
 
     FAIL_SIGNATURE = args.failSignature
@@ -346,7 +355,9 @@ if __name__ == "__main__":
     FAIL_JWS_CUSTOM = args.failjwscustom
     FAIL_IAT = args.failiat
     FAIL_TTL = args.failttl
+    SANCTIONED_WALLET = args.sanctionedWallet
 
     if load_data():
         print(f"[*] Starting Payee Server at http://{HOST}:{PORT}...")
-        app.run(host=HOST, port=PORT, debug=False, use_reloader=False)
+        # Binding to 127.0.0.1 ensures compatibility with both localhost and 127.0.0.1 access
+        app.run(host='127.0.0.1', port=PORT, debug=False, use_reloader=False)

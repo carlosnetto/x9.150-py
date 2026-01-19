@@ -352,9 +352,9 @@ def sign_jws_with_fail_logic(payload, private_key_pem, headers):
     if FAIL_SIGNATURE:
         print("[!] Testing Mode: Intentionally corrupting the signature (modifying the signature string).")
         parts = token.split('.')
-        # Modify the last character of the signature part to invalidate it
+        # Modify the first character of the signature part to invalidate it
         sig = parts[2]
-        corrupted_sig = sig[:-1] + ('0' if sig[-1] != '0' else '1')
+        corrupted_sig = ('0' if sig[0] != '0' else '1') + sig[1:]
         return f"{parts[0]}.{parts[1]}.{corrupted_sig}"
         
     return token

@@ -6,7 +6,7 @@
     "revisedAt": "2024-04-30T12:00:00Z",
     "sentAt": "2024-05-01T21:30:00Z",
     "validUntil": "2024-05-25T23:59:59Z",
-    "status": "active",
+    "status": "ACTIVE",
     "paymentNotification": "https://payee-psp.org/notify/123e4567-e89b-12d3-a456-426614174000",
     "creditor": {
         "name": "California Electric Company",

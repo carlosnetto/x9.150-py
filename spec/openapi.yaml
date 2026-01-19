@@ -27,6 +27,7 @@ components:
           example: 0
         qrCodeContent:
           type: string
+          pattern: '^[a-zA-Z0-9_-]{0,1024}$'
           description: "The raw string content obtained from scanning the QR code, encoded in base64url. Note: In the EMV QR structure, Tag 26 Subtag 01 omits the protocol and the '://' separator (e.g., 'bank.com/fetch/uid') to save space and assumes https://. This allows the Payer to verify that the scanned QR code matches the one linked to this JSON payload."
         createdAt:
           description: "The moment the payment request record was first generated."
@@ -45,6 +46,8 @@ components:
         paymentNotification:
           type: string
           format: uri
+          maxLength: 256
+          pattern: '^https?://(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}(?::\d+)?(?:/[^\s]*)?$'
           description: "The URL (webhook) where the payer's PSP sends status updates (e.g., PAYMENT_INITIATED, PAID). Shall adhere to the syntax dictated by RFC 3986."
         creditor:
           $ref: '#/components/schemas/Creditor'
@@ -53,6 +56,7 @@ components:
         unstructured:
           type: string
           maxLength: 140
+          pattern: '^[ -~]*$'
           description: "Free-text remittance information for the payer, often used for human-readable references."
           example: "Account: 987650001, Meter: MTR45567"
         additionalInformation:
@@ -84,25 +88,29 @@ components:
     Timestamp:
       type: string
       format: date-time
-      description: "UTC timestamp in RFC 3339 format with millisecond precision (e.g., 2024-04-30T12:00:00.000Z)."
+      pattern: '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$'
+      maxLength: 24
+      description: "UTC timestamp in RFC 3339 format (based on ISO 8601) with mandatory millisecond precision (e.g., 2024-04-30T12:00:00.000Z)."
       example: "2024-04-30T12:00:00.000Z"
 
     Date:
       type: string
       format: date
-      description: "A regular date carrying just day, month, and year (YYYY-MM-DD)."
+      pattern: '^\d{4}-\d{2}-\d{2}$'
+      maxLength: 10
+      description: "Date format (YYYY-MM-DD) as per ISO 8601."
       example: "2024-04-30"
 
     UUIDNoDashes:
       type: string
       pattern: '^[0-9a-fA-F]{32}$'
-      description: UUID without dashes for better compatibility with some payment rails that can't fit 36 chars.
+      description: "UUID without dashes as per ISO/IEC 9834-8 (RFC 4122) for better compatibility with some payment rails that can't fit 36 chars."
       example: "123e4567e89b12d3a456426614174000"
 
     UUIDWithDashes:
       type: string
       pattern: '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
-      description: "Standard UUID with dashes used for session tracking and correlation."
+      description: "Standard UUID with dashes as per ISO/IEC 9834-8 (RFC 4122) used for session tracking and correlation."
       example: "123e4567-e89b-12d3-a456-426614174000"
 
     JWSHeader:
@@ -134,13 +142,13 @@ components:
     Email:
       type: string
       format: email
-      pattern: '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,254}$'
-      description: "Standard email address format for contact and billing inquiries."
+      pattern: '^[a-zA-Z0-9.!#$%&''*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$'
+      description: "Standard email address format as per RFC 5322 (Internet Message Format) for contact and billing inquiries. Supports sub-addressing (e.g., user+tag@domain.com)."
 
     PhoneNumber:
       type: string
       pattern: '^\+[1-9]\d{1,20}$'
-      description: "Phone number in E.164 format (e.g., +15551234567)."
+      description: "Phone number in ITU-T E.164 format (e.g., +15551234567)."
 
     MCC:
       type: string
@@ -150,6 +158,7 @@ components:
     CountryCode:
       type: string
       pattern: '^[A-Z]{2}$'
+      maxLength: 2
       description: "ISO 3166-1 alpha-2 country code (e.g., 'US')."
 
     CurrencyCode:
@@ -185,6 +194,7 @@ components:
       properties:
         qrCodeContent:
           type: string
+          pattern: '^[a-zA-Z0-9_-]{0,1024}$'
           description: "The raw string content obtained from scanning the QR code, encoded in base64url. This is used to verify the integrity of the scanned data."
       required:
         - qrCodeContent
@@ -208,24 +218,23 @@ components:
             network:
               type: string
               maxLength: 35
+              pattern: '^[ -~]*$'
             transactionId:
               type: string
               maxLength: 128
+              pattern: '^[ -~]*$'
               description: >
                 The unique identifier for the transaction. This field is optional. If the payee is notified prior to sending funds, 
                 the transactionId will be absent (initiation/pre-commit). After sending the funds, a second notification is 
                 performed including the transactionId, marking the payment as finished and the QR code as completed.
-            paymentTiming:
-              type: string
-              enum: [immediate, deferred]
-              description: "The timing of the payment as specified in the bill."
-          required: [amount, currency, network, paymentTiming]
+          required: [amount, currency, network]
         payer:
           type: object
           description: "Flexible object for payer information, allowing custom tags for extensibility."
           properties:
             info:
               type: string
+              pattern: '^[ -~]*$'
               description: "Optional contact or identification info for the payer."
           additionalProperties: true
         expectedDate:
@@ -252,6 +261,7 @@ components:
         name:
           type: string
           maxLength: 50
+          pattern: '^[ -~]*$'
           description: "Legal name of the creditor."
         phone:
           $ref: '#/components/schemas/PhoneNumber'
@@ -277,14 +287,17 @@ components:
             id:
               type: string
               maxLength: 256
+              pattern: '^[ -~]*$'
               description: "The account handle, email, or virtual account number. Any format valid within the creditor"
             schemaName:
               type: string
               maxLength: 70
+              pattern: '^[ -~]*$'
               description: "Name of the schema within that creditor (ex.: $cashTag, e-mail, etc.)"
         name:
           type: string
           maxLength: 50
+          pattern: '^[ -~]*$'
           description: "Name of the ultimate beneficiary."
         phone:
           $ref: '#/components/schemas/PhoneNumber'
@@ -300,27 +313,38 @@ components:
         line1:
           type: string
           maxLength: 60
+          pattern: '^[ -~]*$'
+          example: "123 Main St"
         line2:
           type: string
           maxLength: 60
+          pattern: '^[ -~]*$'
+          example: "Suite 400"
         city:
           type: string
           maxLength: 40
+          pattern: '^[ -~]*$'
+          example: "New York"
         state:
           type: string
           maxLength: 30
+          pattern: '^[ -~]*$'
+          example: "NY"
       anyOf:
         - title: US Address
           properties:
             country:
               type: string
               enum: [US]
-              description: "United States"
+              pattern: '^[A-Z]{2}$'
+              maxLength: 2
+              description: "United States (ISO 3166-1 alpha-2)."
             postalCode:
               type: string
               pattern: '^\d{5}(-\d{4})?$'
               maxLength: 10
               description: "US ZIP code format: 99999 or 99999-9999"
+              example: "10001"
         - title: International Address
           properties:
             country:
@@ -328,6 +352,7 @@ components:
             postalCode:
               type: string
               maxLength: 20
+              pattern: '^[ -~]*$'
               description: "Free format postal code for non-US countries."
 
     Bill:
@@ -337,6 +362,7 @@ components:
         description:
           type: string
           maxLength: 100
+          pattern: '^[ -~]*$'
           description: "A brief summary of the goods or services provided."
         paymentTiming:
           type: string
@@ -349,6 +375,7 @@ components:
             number:
               type: string
               maxLength: 50
+              pattern: '^[ -~]*$'
             date:
               $ref: '#/components/schemas/Date'
               description: "The date the order was placed (YYYY-MM-DD)."
@@ -368,6 +395,7 @@ components:
         number:
           type: string
           maxLength: 50
+          pattern: '^[ -~]*$'
           description: "The unique invoice identifier."
         date:
           $ref: '#/components/schemas/Date'
@@ -381,6 +409,7 @@ components:
             name:
               type: string
               maxLength: 50
+              pattern: '^[ -~]*$'
             phone:
               $ref: '#/components/schemas/PhoneNumber'
             email:
@@ -409,6 +438,7 @@ components:
         explanation:
           type: string
           maxLength: 200
+          pattern: '^[ -~]*$'
           description: "Human-readable reason for the adjustment."
         amount:
           $ref: '#/components/schemas/SignedMonetaryAmount'
@@ -451,9 +481,30 @@ components:
         key:
           type: string
           maxLength: 30
+          pattern: '^[ -~]*$'
         value:
           type: string
           maxLength: 218
+          pattern: '^[ -~]*$'
+
+    TraditionalNetworkDetails:
+      type: object
+      properties:
+        routingNumber:
+          type: string
+          maxLength: 9
+          pattern: '^\d{9}$'
+          description: "The financial institution's routing identifier (ABA, BIC, etc.)."
+        accountNumber:
+          type: string
+          maxLength: 17
+          pattern: '^\d{1,17}$'
+          description: "The specific account number at the institution."
+        protectionType:
+          type: string
+          maxLength: 15
+          pattern: '^[ -~]*$'
+          description: "The security mechanism used (e.g., 'tokenized', 'cleartext')."
 
     PaymentMethod:
       description: "Defines a specific currency and network combination for fulfilling the payment."
@@ -479,23 +530,13 @@ components:
                   $ref: '#/components/schemas/MonetaryAmount'
         networks:
           type: object
-          description: "A map of payment networks (e.g., 'FedNow', 'Base') and their specific routing details."
+          description: "A map of payment networks and their specific routing details. Explicitly supports FedNow, RTP, and ACH, while allowing other networks via additional properties."
+          properties:
+            FedNow:
+              $ref: '#/components/schemas/TraditionalNetworkDetails'
+            RTP:
+              $ref: '#/components/schemas/TraditionalNetworkDetails'
+            ACH:
+              $ref: '#/components/schemas/TraditionalNetworkDetails'
           additionalProperties:
-            type: object
-            properties:
-              routingNumber:
-                type: string
-                maxLength: 9
-                description: "The financial institution's routing identifier (ABA, BIC, etc.)."
-              accountNumber:
-                type: string
-                maxLength: 17
-                description: "The specific account number at the institution."
-              protectionType:
-                type: string
-                maxLength: 15
-                description: "The security mechanism used (e.g., 'tokenized', 'cleartext')."
-              address:
-                type: string
-                maxLength: 128
-                description: "The public wallet address for DLT/Blockchain networks."
+            true

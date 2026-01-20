@@ -6,9 +6,8 @@ __pycache__/
 venv/
 
 # Project specific generated files
-qrcode.txt
-qrcode.png
-payload.json
+.DS_Store
 wallet_keys.txt
 openapi_flattened.csv
-.DS_Store
+payer_db/
+payee_db/

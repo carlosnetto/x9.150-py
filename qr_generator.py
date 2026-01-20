@@ -19,9 +19,6 @@ from referencing.jsonschema import DRAFT7
 PORT = 5005
 HOST = "localhost"
 BASE_URL = f"http://{HOST}:{PORT}"
-QR_TEXT_FILE = "qrcode.txt"
-QR_IMAGE_FILE = "qrcode.png"
-PAYLOAD_FILE = "payload.json"
 
 # --- DATA PROCESSING ---
 def validate_against_spec(data, schema_name):
@@ -185,18 +182,34 @@ if __name__ == "__main__":
     # Validate the created payload against the spec
     validate_against_spec(final_payload, "PaymentRequest")
 
-    with open(QR_TEXT_FILE, "w") as f:
-        f.write(emv_qr_string)
-    print(f"[*] Raw QR string saved to '{QR_TEXT_FILE}'.")
+    # Ensure output directories exist
+    os.makedirs("payee_db/qrs", exist_ok=True)
+    os.makedirs("payer_db/qrs", exist_ok=True)
 
-    with open(PAYLOAD_FILE, "w") as f:
+    # 1. Save JSON Payload to payee_db/qrs/{id}.json
+    json_path = os.path.join("payee_db/qrs", f"{txn_id}.json")
+    with open(json_path, "w") as f:
         json.dump(final_payload, f, indent=4)
-    print(f"[*] Final X9.150 payload saved to '{PAYLOAD_FILE}'.")
+    print(f"[*] Final X9.150 payload saved to '{json_path}'.")
 
+    # 2. Construct filename for Payer artifacts
+    merchant_name = template_data.get("creditor", {}).get("name", "Merchant")
+    safe_merchant_name = "".join([c for c in merchant_name if c.isalnum() or c in (' ', '-', '_')]).strip()
+    truncated_name = safe_merchant_name[:15]
+    base_filename = f"{txn_id} - {truncated_name}"
+
+    # 3. Save QR Content String (.txt)
+    txt_path = os.path.join("payer_db/qrs", f"{base_filename}.txt")
+    with open(txt_path, "w") as f:
+        f.write(emv_qr_string)
+    print(f"[*] Raw QR string saved to '{txt_path}'.")
+
+    # 4. Save QR Image (.png)
+    img_path = os.path.join("payer_db/qrs", f"{base_filename}.png")
     print("[*] Generating QR Code Image...")
     qr = qrcode.QRCode(version=1, box_size=10, border=4)
     qr.add_data(emv_qr_string)
     qr.make(fit=True)
     img = qr.make_image(fill_color="black", back_color="white")
-    img.save(QR_IMAGE_FILE)
-    print(f"[*] QR Code image saved as '{QR_IMAGE_FILE}'.")
+    img.save(img_path)
+    print(f"[*] QR Code image saved as '{img_path}'.")

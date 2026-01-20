@@ -23,7 +23,7 @@ import referencing
 from referencing.jsonschema import DRAFT7
 
 # --- CONFIGURATION ---
-QR_TEXT_FILE = "qrcode.txt"
+QR_DIR = "payer_db/qrs"
 FAIL_SIGNATURE = False
 FAIL_JWS_CUSTOM = False
 
@@ -86,17 +86,17 @@ def extract_fetch_url(emv_str):
 def load_payer_identity():
     """Loads the persistent Payer keys and prepares the x5c header."""
     try:
-        with open("payer_key.txt", "rb") as f:
+        with open("payer_db/certs/payer_key.txt", "rb") as f:
             private_pem = f.read()
         
-        with open("payer_cert.pem", "rb") as f:
+        with open("payer_db/certs/payer_cert.pem", "rb") as f:
             cert_data = f.read()
             cert = x509.load_pem_x509_certificate(cert_data)
             # x5c requires DER format, then standard Base64 encoding
             cert_b64 = base64.b64encode(cert.public_bytes(serialization.Encoding.DER)).decode('utf-8')
             
         # Load x5u from JWKS to include in our own headers
-        with open("payer.jwks", "r") as f:
+        with open("payer_db/certs/payer.jwks", "r") as f:
             jwks = json.load(f)
             x5u = jwks["keys"][0].get("x5u")
             
@@ -406,11 +406,37 @@ def run_payer(fail_sig=False, fail_jws_custom=False, fail_iat=False, fail_ttl=Fa
     FAIL_JWS_CUSTOM = fail_jws_custom
 
     # 1. Read the QR code content (simulating a scan)
-    if not os.path.exists(QR_TEXT_FILE):
-        print(f"[!] Error: {QR_TEXT_FILE} not found. Run qr_generator.py first.")
+    if not os.path.exists(QR_DIR):
+        print(f"[!] Error: {QR_DIR} not found. Run qr_generator.py first.")
         return
 
-    with open(QR_TEXT_FILE, "r") as f:
+    raw_files = [f for f in os.listdir(QR_DIR) if f.endswith(".txt")]
+    if not raw_files:
+        print(f"[!] No QR files found in {QR_DIR}.")
+        return
+
+    # Sort by modification time
+    raw_files.sort(key=lambda x: os.path.getmtime(os.path.join(QR_DIR, x)))
+
+    print("\nAvailable QR Codes:")
+    for i, f in enumerate(raw_files, 1):
+        print(f"{i}. {f}")
+
+    selected_file = None
+    while selected_file is None:
+        try:
+            choice = input("\nWhich one do you want to pay? ")
+            idx = int(choice) - 1
+            if 0 <= idx < len(raw_files):
+                selected_file = os.path.join(QR_DIR, raw_files[idx])
+            else:
+                print(f"[!] Invalid selection. Please enter a number between 1 and {len(raw_files)}.")
+        except ValueError:
+            print("[!] Invalid input. Please enter a number.")
+
+    print(f"[*] Using QR file: {selected_file}")
+
+    with open(selected_file, "r") as f:
         qrcode_content = f.read().strip()
 
     print(f"[*] Scanned QR Content: {qrcode_content}")
@@ -498,6 +524,12 @@ def run_payer(fail_sig=False, fail_jws_custom=False, fail_iat=False, fail_ttl=Fa
             payload_json = json.loads(payload_bytes.decode('utf-8'))
             validate_against_spec(payload_json, "PaymentRequest")
             display_payload(payload_json)
+
+            # Ask for user permission before proceeding
+            confirm = input("\nShould I pay it? (y/n): ").strip().lower()
+            if confirm != 'y':
+                print("[*] Payment cancelled by user.")
+                return
 
             # Ensure the request is ACTIVE before proceeding
             status = payload_json.get("status")

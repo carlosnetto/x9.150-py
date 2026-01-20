@@ -16,8 +16,11 @@ def bytes_to_base64url(data: bytes) -> str:
     """Helper to convert bytes to base64url encoding as required by JWK."""
     return base64.urlsafe_b64encode(data).rstrip(b'=').decode('ascii')
 
-def generate_key_pair(name, cert_url_base):
-    print(f"Generating keys for {name}...")
+def generate_key_pair(name, cert_url_base, output_folder):
+    print(f"Generating keys for {name} in {output_folder}...")
+
+    if not os.path.exists(output_folder):
+        os.makedirs(output_folder)
 
     # 1. Generate ECC Private Key (P-256 curve).
     # X9.150 uses Elliptic Curve Cryptography because it provides high security 
@@ -33,7 +36,7 @@ def generate_key_pair(name, cert_url_base):
         format=serialization.PrivateFormat.PKCS8,
         encryption_algorithm=serialization.NoEncryption()
     )
-    with open(f"{name}_key.txt", "wb") as f:
+    with open(os.path.join(output_folder, f"{name}_key.txt"), "wb") as f:
         f.write(private_pem)
 
     # 3. Create a Self-Signed Certificate
@@ -59,7 +62,7 @@ def generate_key_pair(name, cert_url_base):
     # Save Certificate as PEM (to be served by certserv.py later)
     # PEM is the text-based format (Base64) often used for web transmission.
     cert_pem = cert.public_bytes(serialization.Encoding.PEM)
-    with open(f"{name}_cert.pem", "wb") as f:
+    with open(os.path.join(output_folder, f"{name}_cert.pem"), "wb") as f:
         f.write(cert_pem)
 
     # 3.5 Create a Certificate Signing Request (CSR)
@@ -67,7 +70,7 @@ def generate_key_pair(name, cert_url_base):
     csr = x509.CertificateSigningRequestBuilder().subject_name(
         subject
     ).sign(private_key, hashes.SHA256())
-    with open(f"{name}.csr", "wb") as f:
+    with open(os.path.join(output_folder, f"{name}.csr"), "wb") as f:
         f.write(csr.public_bytes(serialization.Encoding.PEM))
 
     # 4. Calculate SHA256 Thumbprint (x5t#S256)
@@ -100,14 +103,14 @@ def generate_key_pair(name, cert_url_base):
 
     jwks = {"keys": [jwk]}
 
-    with open(f"{name}.jwks", "w") as f:
+    with open(os.path.join(output_folder, f"{name}.jwks"), "w") as f:
         json.dump(jwks, f, indent=4)
 
-    print(f"Successfully created {name}_key.txt, {name}_cert.pem, {name}.csr, and {name}.jwks")
+    print(f"Successfully created keys in {output_folder}: {name}_key.txt, {name}_cert.pem, {name}.csr, and {name}.jwks")
 
 if __name__ == "__main__":
     # Arbitrary local URL for the certificate server
     BASE_URL = "http://localhost:5001"
     
-    generate_key_pair("payee", BASE_URL)
-    generate_key_pair("payer", BASE_URL)
+    generate_key_pair("payee", BASE_URL, "payee_db/certs")
+    generate_key_pair("payer", BASE_URL, "payer_db/certs")

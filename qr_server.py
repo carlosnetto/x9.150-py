@@ -24,7 +24,7 @@ from referencing.jsonschema import DRAFT7
 # --- CONFIGURATION ---
 PORT = 5005
 HOST = "localhost"
-PAYLOAD_FILE = "payload.json"
+PAYLOAD_DIR = "payee_db/qrs"
 
 app = Flask(__name__)
 
@@ -69,7 +69,7 @@ def load_data():
 
     # 1. Load the Private Key
     try:
-        with open("payee_key.txt", "rb") as f:
+        with open("payee_db/certs/payee_key.txt", "rb") as f:
             private_key_pem = f.read()
     except FileNotFoundError:
         print("[!] Error: payee_key.txt not found. Run keygen.py first.")
@@ -77,7 +77,7 @@ def load_data():
 
     # 2. Load the Certificate for x5c (to avoid extra HTTP hits)
     try:
-        with open("payee_cert.pem", "rb") as f:
+        with open("payee_db/certs/payee_cert.pem", "rb") as f:
             cert_data = f.read()
             cert = x509.load_pem_x509_certificate(cert_data)
             # x5c requires DER format, then standard Base64 encoding
@@ -92,7 +92,7 @@ def load_data():
 
     # 3. Load Payer's Public Key to verify incoming notifications
     try:
-        with open("payer_cert.pem", "rb") as f:
+        with open("payer_db/certs/payer_cert.pem", "rb") as f:
             cert_data = f.read()
             cert = x509.load_pem_x509_certificate(cert_data)
             payer_public_key = cert.public_key()
@@ -102,23 +102,15 @@ def load_data():
 
     # 4. Load the JWKS metadata for JWS headers
     try:
-        with open("payee.jwks", "r") as f:
+        with open("payee_db/certs/payee.jwks", "r") as f:
             jwks = json.load(f)
             jwk_metadata = jwks["keys"][0]
     except (FileNotFoundError, IndexError, KeyError):
         print("[!] Error: payee.jwks is missing or invalid.")
         return False
 
-    if not os.path.exists(PAYLOAD_FILE):
-        print(f"[*] Warning: {PAYLOAD_FILE} not found. Ensure qr_generator.py is run.")
-    else:
-        with open(PAYLOAD_FILE, "r") as f:
-            payload_data = json.load(f)
-            txn_id = payload_data.get("id")
-            if txn_id:
-                # URLs shall adhere to the syntax dictated by RFC 3986.
-                print(f"[*] Fetch URL:  http://{HOST}:{PORT}/fetch/{txn_id}")
-                print(f"[*] Notify URL: http://{HOST}:{PORT}/notify/{txn_id}")
+    if not os.path.exists(PAYLOAD_DIR):
+        os.makedirs(PAYLOAD_DIR, exist_ok=True)
 
     print(f"[*] Payee keys and JWKS metadata loaded.")
     return True
@@ -268,13 +260,14 @@ def fetch_payload(payload_id):
     except:
         print(f"[*] JWS Body: {claims}")
 
-    if not os.path.exists(PAYLOAD_FILE):
-        body = {"statusCode": 404, "error": "Payload file not found"}
+    payload_path = os.path.join(PAYLOAD_DIR, f"{payload_id}.json")
+    if not os.path.exists(payload_path):
+        body = {"statusCode": 404, "error": "Payload not found"}
         validate_against_spec(body, "SignedStatusCodePayload")
         signed_err = sign_jws(body, private_key_pem, incoming_headers.get("correlationId"), is_fetch=True)
         return signed_err, 404, {'Content-Type': 'application/jose'}
 
-    with open(PAYLOAD_FILE, "r") as f:
+    with open(payload_path, "r") as f:
         payload_data = json.load(f)
 
     if payload_data.get("id") != payload_id:
@@ -318,12 +311,13 @@ def receive_notification(payload_id):
     except:
         print(f"[*] Raw Body: {raw_data}")
 
-    if not os.path.exists(PAYLOAD_FILE):
+    payload_path = os.path.join(PAYLOAD_DIR, f"{payload_id}.json")
+    if not os.path.exists(payload_path):
         body = {"statusCode": 404, "error": "No active transaction found"}
         validate_against_spec(body, "SignedStatusCodePayload")
         return sign_jws(body, private_key_pem, incoming_headers.get("correlationId")), 404, {'Content-Type': 'application/jose'}
 
-    with open(PAYLOAD_FILE, "r") as f:
+    with open(payload_path, "r") as f:
         payload_data = json.load(f)
 
     if payload_data.get("id") != payload_id:

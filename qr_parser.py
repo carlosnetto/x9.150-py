@@ -6,7 +6,7 @@ import os
 import re
 
 # --- CONFIGURATION ---
-QR_TEXT_FILE = "qrcode.txt"
+QR_DIR = "payer_db/qrs"
 
 def calculate_crc(data_string):
     """Calculates the CRC-16/CCITT-FALSE (0xFFFF, 0x1021) for EMV QR."""
@@ -103,12 +103,8 @@ def parse_tlv(data, parent_tag=None):
         i += 4 + length
     return results
 
-def main():
-    if not os.path.exists(QR_TEXT_FILE):
-        print(f"[!] Error: {QR_TEXT_FILE} not found. Run qr_generator.py first.")
-        return
-
-    with open(QR_TEXT_FILE, "r") as f:
+def process_qr_file(file_path):
+    with open(file_path, "r") as f:
         qr_content = f.read().strip()
 
     print("="*110)
@@ -147,6 +143,38 @@ def main():
                 print(f"26.{sub['tag']:2} | {sub['length']:02}  | {sub_status:12} | {sub['description']:40} | {sub['value']}")
 
     print("="*110)
+
+def main():
+    if not os.path.exists(QR_DIR):
+        print(f"[!] Error: {QR_DIR} not found. Run qr_generator.py first.")
+        return
+
+    while True:
+        raw_files = [f for f in os.listdir(QR_DIR) if f.endswith(".txt")]
+        if not raw_files:
+            print(f"[!] No QR files found in {QR_DIR}.")
+            return
+
+        # Sort by modification time
+        raw_files.sort(key=lambda x: os.path.getmtime(os.path.join(QR_DIR, x)))
+
+        print("\nAvailable QR Codes:")
+        for i, f in enumerate(raw_files, 1):
+            print(f"{i}. {f}")
+
+        choice = input("\nWhich one do you want to parse? (q to quit) ")
+        if choice.lower() == 'q':
+            break
+
+        try:
+            idx = int(choice) - 1
+            if 0 <= idx < len(raw_files):
+                selected_file = os.path.join(QR_DIR, raw_files[idx])
+                process_qr_file(selected_file)
+            else:
+                print(f"[!] Invalid selection. Please enter a number between 1 and {len(raw_files)}.")
+        except ValueError:
+            print("[!] Invalid input. Please enter a number.")
 
 if __name__ == "__main__":
     main()

@@ -8,7 +8,8 @@ from flask import Flask, send_from_directory, abort
 app = Flask(__name__)
 
 # Directory where the certificates and JWKS files are located
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+PAYEE_CERT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "payee_db/certs")
+PAYER_CERT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "payer_db/certs")
 
 @app.route('/<filename>')
 def serve_static_file(filename):
@@ -26,10 +27,15 @@ def serve_static_file(filename):
     if ext not in allowed_extensions:
         return abort(403, description="Access to this file type is restricted.")
 
-    if not os.path.isfile(os.path.join(BASE_DIR, filename)):
-        return abort(404, description="File not found.")
+    # Check Payee DB
+    if os.path.isfile(os.path.join(PAYEE_CERT_DIR, filename)):
+        return send_from_directory(PAYEE_CERT_DIR, filename)
 
-    return send_from_directory(BASE_DIR, filename)
+    # Check Payer DB
+    if os.path.isfile(os.path.join(PAYER_CERT_DIR, filename)):
+        return send_from_directory(PAYER_CERT_DIR, filename)
+
+    return abort(404, description="File not found.")
 
 if __name__ == '__main__':
     # Port 5001 as requested to avoid conflict with qr_server (port 5005)

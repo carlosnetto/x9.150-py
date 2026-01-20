@@ -57,6 +57,7 @@ pip install -r requirements.txt
 
 ### 1. Generate Keys and Certificates
 First, generate the necessary ECC key pairs, self-signed certificates, and JWKS metadata for both the Payer and Payee.
+Artifacts are generated into `payee_db/certs` and `payer_db/certs`.
 
 ```bash
 python keygen.py
@@ -64,6 +65,7 @@ python keygen.py
 
 ### 2. Start the Certificate Server
 Run the certificate server to host the public certificates. This allows the JWS `x5u` header to function correctly during verification.
+It serves files from both `payee_db/certs` and `payer_db/certs`.
 
 ```bash
 python certserv.py
@@ -71,6 +73,8 @@ python certserv.py
 
 ### 3. Generate QR Code & Payload
 Run the generator script with a biller template to create the payment payload, raw QR string, and QR code image.
+*   **Payee Data**: The JSON payload (what the server returns) is saved to `payee_db/qrs`.
+*   **Payer Data**: The QR code image and text content (what the user scans) are saved to `payer_db/qrs`.
 
 ```bash
 python qr_generator.py templates/01_coffee_shop.json
@@ -110,11 +114,11 @@ This generates `openapi_flattened.csv`, providing a flattened view of all JSON p
 ### Technical Component Breakdown
 To understand the implementation, follow these files in order to see how the X9.150 trust chain is built:
 
-1.  **`keygen.py` (The Trust Setup)**: Generates Elliptic Curve (ECC) keys and X.509 certificates. In X9.150, identity is bound to these certificates. This simulates the enrollment of a Merchant or Bank into the payment network.
-2.  **`certserv.py` (The Certificate Repository)**: Hosts public certificates and JWKS metadata. When a Payer receives a signed message, they use the `x5u` (X.509 URL) header to fetch the certificate from this server to verify the signature.
-3.  **`qr_generator.py` (The Merchant POS)**: Creates the EMVCo-compliant QR string. Instead of just encoding a price, it encodes a secure, unique URL pointing to the `qr_server.py`.
-4.  **`qr_server.py` (The Payee Backend)**: The core logic. It manages the `/fetch/` endpoint (delivering the signed payment payload) and the `/notify/` endpoint (receiving and verifying the payment confirmation).
-5.  **`qr_payer.py` (The Wallet Simulator)**: Simulates the consumer's banking app. It performs the critical "Verification" step: checking the Merchant's JWS signature and validating the certificate before showing the "Pay" button to the user.
+1.  **`keygen.py` (The Trust Setup)**: Generates Elliptic Curve (ECC) keys and X.509 certificates into `payee_db/certs` and `payer_db/certs`. In X9.150, identity is bound to these certificates. This simulates the enrollment of a Merchant or Bank into the payment network.
+2.  **`certserv.py` (The Certificate Repository)**: Hosts public certificates and JWKS metadata from the `*_db/certs` folders. When a Payer receives a signed message, they use the `x5u` (X.509 URL) header to fetch the certificate from this server to verify the signature.
+3.  **`qr_generator.py` (The Merchant POS)**: Creates the EMVCo-compliant QR string. It saves the secure JSON payload to `payee_db/qrs` (for the server) and the QR code to `payer_db/qrs` (for the payer to scan).
+4.  **`qr_server.py` (The Payee Backend)**: The core logic. It loads keys from `payee_db/certs` and payloads from `payee_db/qrs`. It manages the `/fetch/` endpoint and the `/notify/` endpoint.
+5.  **`qr_payer.py` (The Wallet Simulator)**: Simulates the consumer's banking app. It scans QR codes from `payer_db/qrs` and loads its own identity from `payer_db/certs`. It performs the critical "Verification" step: checking the Merchant's JWS signature and validating the certificate before showing the "Pay" button to the user.
 
 ### The Security Handshake (JWS)
 The security of X9.150 relies on **JSON Web Signatures (JWS)**. Every exchange follows this pattern:

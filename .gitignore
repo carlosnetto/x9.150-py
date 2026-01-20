@@ -5,8 +5,12 @@ __pycache__/
 # Virtual Environment
 venv/
 
-# Project specific generated files
+# OS generated files
 .DS_Store
+.DS_Store?
+._*
+
+# Project specific generated files
 wallet_keys.txt
 openapi_flattened.csv
 payer_db/

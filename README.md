@@ -119,6 +119,57 @@ To understand the implementation, follow these files in order to see how the X9.
 3.  **`qr_generator.py` (The Merchant POS)**: Creates the EMVCo-compliant QR string. It saves the secure JSON payload to `payee_db/qrs` (for the server) and the QR code to `payer_db/qrs` (for the payer to scan).
 4.  **`qr_server.py` (The Payee Backend)**: The core logic. It loads keys from `payee_db/certs` and payloads from `payee_db/qrs`. It manages the `/fetch/` endpoint and the `/notify/` endpoint.
 5.  **`qr_payer.py` (The Wallet Simulator)**: Simulates the consumer's banking app. It scans QR codes from `payer_db/qrs` and loads its own identity from `payer_db/certs`. It performs the critical "Verification" step: checking the Merchant's JWS signature and validating the certificate before showing the "Pay" button to the user.
+6.  **`qr_appserver.py` (The App Developer Proxy)**: A gateway designed to simplify integration for mobile and web applications. It handles all JWS signing and verification internally, allowing the frontend to communicate using plain JSON.
+
+## App Server Proxy (`qr_appserver.py`)
+
+The `qr_appserver.py` listens on port **5010**. Its primary purpose is to act as a bridge for mobile apps or webapps that want to implement X9.150 without initially implementing the full JWS (JSON Web Signature) stack.
+
+### ⚠️ Payment Responsibility Disclaimer
+The `qr_appserver.py` **does not handle wallets, mnemonics (12 words), or blockchain transactions.** 
+*   The mobile app is responsible for managing the user's private keys.
+*   The mobile app is responsible for executing the actual payment on the blockchain (Solana, Ethereum, Base, etc.) using the details provided in the `PaymentRequest`.
+*   The app server simply facilitates the secure communication protocol defined by X9.150.
+
+### Exposed APIs
+
+#### 1. Generate QR Content (`/generate`)
+Used by a merchant-side app to generate a new QR code string from a template.
+*   **Request (POST)**: A JSON Payment Request template (compatible with `openapi.yaml`).
+*   **Returns**: 
+    ```json
+    {
+        "qrContent": "00020101021226...",
+        "filePath": "payer_db/qrs/..."
+    }
+    ```
+
+#### 2. Fetch Payment Details (`/fetch`)
+Used by a payer-side app after scanning a QR code to get the full, verified payment details.
+*   **Request (POST)**: 
+    ```json
+    { "qrCodeContent": "00020101021226..." }
+    ```
+*   **Process**: The proxy extracts the URL, signs a JWS request, fetches the data from the merchant's `qr_server`, verifies the merchant's signature, and returns plain JSON.
+*   **Returns**: A plain JSON `PaymentRequest` object containing amounts, merchant info, and supported payment networks.
+
+#### 3. Notify Payment (`/notify`)
+Used by a payer-side app to inform the merchant that a payment has been initiated or completed.
+*   **Request (POST)**:
+    ```json
+    {
+        "id": "transaction-uuid",
+        "payment": {
+            "amount": 1000,
+            "currency": "USDC",
+            "network": "Base",
+            "transactionId": "0x..." 
+        },
+        "payer": { "info": "user@email.com", "fromAddress": "0x..." },
+        "expectedDate": "2025-09-30T18:04:00Z"
+    }
+    ```
+*   **Returns**: The status code and response from the upstream `qr_server` (e.g., `{"statusCode": 200}`).
 
 ### The Security Handshake (JWS)
 The security of X9.150 relies on **JSON Web Signatures (JWS)**. Every exchange follows this pattern:

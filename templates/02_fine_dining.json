@@ -76,6 +76,15 @@
                     "address": "0xa6d0AeFeB0427E0011003BFD8486f7b12b8C2ceb"
                 }
             }
+        },
+        {
+            "currency": "BRL",
+            "amount": 67125,
+            "networks": {
+                "Pix": {
+                    "key": "carlos.netto@gmail.com"
+                }
+            }
         }
     ]
 }

@@ -25,18 +25,23 @@ def serve_static_file(filename):
     _, ext = os.path.splitext(filename)
     
     if ext not in allowed_extensions:
+        print(f"CERTSERV: [!] Access denied for {filename}")
         return abort(403, description="Access to this file type is restricted.")
 
     # Check Payee DB
     if os.path.isfile(os.path.join(PAYEE_CERT_DIR, filename)):
+        print(f"CERTSERV: Serving {filename} from Payee DB")
         return send_from_directory(PAYEE_CERT_DIR, filename)
 
     # Check Payer DB
     if os.path.isfile(os.path.join(PAYER_CERT_DIR, filename)):
+        print(f"CERTSERV: Serving {filename} from Payer DB")
         return send_from_directory(PAYER_CERT_DIR, filename)
 
+    print(f"CERTSERV: [!] File not found: {filename}")
     return abort(404, description="File not found.")
 
 if __name__ == '__main__':
     # Port 5001 as requested to avoid conflict with qr_server (port 5005)
+    print("CERTSERV: Starting Certificate Server on port 5001...")
     app.run(host='127.0.0.1', port=5001)

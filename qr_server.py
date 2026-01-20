@@ -25,6 +25,7 @@ from referencing.jsonschema import DRAFT7
 PORT = 5005
 HOST = "localhost"
 PAYLOAD_DIR = "payee_db/qrs"
+CACHE_DIR = "payee_db/cache"
 
 app = Flask(__name__)
 
@@ -40,6 +41,7 @@ FAIL_JWS_CUSTOM = False
 FAIL_IAT = False
 FAIL_TTL = False
 SANCTIONED_WALLET = None
+USE_X5C = False
 
 def validate_against_spec(data, schema_name):
     """Validates JSON against the OpenAPI spec. Required for spec validation testing."""
@@ -59,9 +61,9 @@ def validate_against_spec(data, schema_name):
 
     try:
         Draft7Validator(target_schema, registry=registry).validate(data)
-        print(f"[OK] JSON validated against {schema_name}")
+        print(f"QR_SERVER: [OK] JSON validated against {schema_name}")
     except Exception as e:
-        print(f"[!] Spec Validation Error ({schema_name}): {e}")
+        print(f"QR_SERVER: [!] Spec Validation Error ({schema_name}): {e}")
 
 def load_data():
     """Loads the generated ECC keys, certificates, and JWKS metadata."""
@@ -72,7 +74,7 @@ def load_data():
         with open("payee_db/certs/payee_key.txt", "rb") as f:
             private_key_pem = f.read()
     except FileNotFoundError:
-        print("[!] Error: payee_key.txt not found. Run keygen.py first.")
+        print("QR_SERVER: [!] Error: payee_key.txt not found. Run keygen.py first.")
         return False
 
     # 2. Load the Certificate for x5c (to avoid extra HTTP hits)
@@ -87,7 +89,7 @@ def load_data():
             cert_der = cert.public_bytes(serialization.Encoding.DER)
             payee_thumbprint = base64.urlsafe_b64encode(hashlib.sha256(cert_der).digest()).rstrip(b'=').decode('ascii')
     except Exception as e:
-        print(f"[!] Error loading payee_cert.pem: {e}")
+        print(f"QR_SERVER: [!] Error loading payee_cert.pem: {e}")
         return False
 
     # 3. Load Payer's Public Key to verify incoming notifications
@@ -97,7 +99,7 @@ def load_data():
             cert = x509.load_pem_x509_certificate(cert_data)
             payer_public_key = cert.public_key()
     except FileNotFoundError:
-        print("[!] Warning: payer_cert.pem not found. Notification verification will fail.")
+        print("QR_SERVER: [!] Warning: payer_cert.pem not found. Notification verification will fail.")
         # We don't return False here to allow the server to start for fetching
 
     # 4. Load the JWKS metadata for JWS headers
@@ -106,13 +108,14 @@ def load_data():
             jwks = json.load(f)
             jwk_metadata = jwks["keys"][0]
     except (FileNotFoundError, IndexError, KeyError):
-        print("[!] Error: payee.jwks is missing or invalid.")
+        print("QR_SERVER: [!] Error: payee.jwks is missing or invalid.")
         return False
 
     if not os.path.exists(PAYLOAD_DIR):
         os.makedirs(PAYLOAD_DIR, exist_ok=True)
+    os.makedirs(CACHE_DIR, exist_ok=True)
 
-    print(f"[*] Payee keys and JWKS metadata loaded.")
+    print(f"QR_SERVER: [*] Payee keys and JWKS metadata loaded.")
     return True
 
 def sign_jws(payload, key_pem, correlation_id=None, is_fetch=False):
@@ -124,26 +127,24 @@ def sign_jws(payload, key_pem, correlation_id=None, is_fetch=False):
 
     iat = int(time.time())
     if FAIL_IAT:
-        print("[!] Testing Mode: Intentionally returning an iat from 11 minutes ago.")
+        print("QR_SERVER: [!] Testing Mode: Intentionally returning an iat from 11 minutes ago.")
         iat -= 660 # 11 minutes ago
 
     ttl_val = (iat * 1000) + 60000 # 1 minute after iat
     if FAIL_TTL:
-        print("[!] Testing Mode: Intentionally returning an expired ttl.")
+        print("QR_SERVER: [!] Testing Mode: Intentionally returning an expired ttl.")
         ttl_val = (int(time.time()) * 1000) - 1000 # 1 second ago
     
     effective_correlation_id = correlation_id or str(uuid.uuid4())
 
     if is_fetch and FAIL_CORRELATION_ID:
-        print("[!] Testing Mode: Intentionally returning a wrong correlationId.")
+        print("QR_SERVER: [!] Testing Mode: Intentionally returning a wrong correlationId.")
         effective_correlation_id = str(uuid.uuid4())
 
     headers = {
         "alg": "ES256", # ECDSA using P-256 and SHA-256
         "typ": "payresp+jws", # X9.150 specific type for payment responses
-        "x5c": [payee_cert_b64],  # Embeds the cert directly to avoid HTTP hits
         "x5u": jwk_metadata.get("x5u"), # Kept as a standard fallback
-        "x5t#S256": payee_thumbprint,
         "kid": jwk_metadata.get("kid"),
         "iat": iat, # Issued At: Prevents replay attacks
         "ttl": ttl_val, # Time To Live: Ensures the message is fresh
@@ -152,13 +153,18 @@ def sign_jws(payload, key_pem, correlation_id=None, is_fetch=False):
         "crit": ["correlationId", "iat", "ttl"]
     }
 
+    if USE_X5C:
+        headers["x5c"] = [payee_cert_b64]
+    else:
+        headers["x5t#S256"] = payee_thumbprint
+
     if FAIL_JWS_CUSTOM:
         fields = ["iat", "ttl", "correlationId"]
         to_remove = []
         while not to_remove:
             to_remove = [f for f in fields if random.choice([True, False])]
         
-        print(f"[!] Testing Mode: Intentionally omitting JWS headers in response: {to_remove}")
+        print(f"QR_SERVER: [!] Testing Mode: Intentionally omitting JWS headers in response: {to_remove}")
         for field in to_remove:
             if field in headers:
                 del headers[field]
@@ -166,7 +172,7 @@ def sign_jws(payload, key_pem, correlation_id=None, is_fetch=False):
     token = jws.sign(payload, key_pem, headers=headers, algorithm='ES256')
 
     if FAIL_SIGNATURE:
-        print("[!] Testing Mode: Intentionally corrupting the signature (modifying the signature string).")
+        print("QR_SERVER: [!] Testing Mode: Intentionally corrupting the signature (modifying the signature string).")
         parts = token.split('.')
         # Modify the first character of the signature part to invalidate it
         sig = parts[2]
@@ -176,23 +182,50 @@ def sign_jws(payload, key_pem, correlation_id=None, is_fetch=False):
     return token
 
 def verify_jws(token):
-    """Verifies a JWS using x5c (embedded) or x5u (remote via certserv)."""
+    """Verifies a JWS using cache, x5c (embedded), or x5u (remote)."""
     header = jws.get_unverified_header(token)
+    thumbprint = header.get("x5t#S256")
+    cert = None
     
-    # 1. Try x5c (Embedded Certificate)
-    # This is faster because we don't need to make an extra network call.
-    if 'x5c' in header:
+    # 1. Try Cache
+    if thumbprint:
+        cache_path = os.path.join(CACHE_DIR, f"{thumbprint}.pem")
+        if os.path.exists(cache_path):
+            print(f"QR_SERVER: Cache Hit for certificate {thumbprint}")
+            with open(cache_path, "rb") as f:
+                cert = x509.load_pem_x509_certificate(f.read())
+
+    # 2. Try x5c (Embedded Certificate)
+    if not cert and 'x5c' in header:
         cert_der = base64.b64decode(header['x5c'][0])
         cert = x509.load_der_x509_certificate(cert_der)
-        payload = jws.verify(token, cert.public_key(), algorithms=['ES256'])
-        return payload, header
-    # 2. Try x5u (Certificate URL)
-    if 'x5u' in header:
+        
+    # 3. Try x5u (Certificate URL)
+    if not cert and 'x5u' in header:
+        print(f"QR_SERVER: Fetching certificate from {header['x5u']}")
         r = requests.get(header['x5u'])
-        cert = x509.load_pem_x509_certificate(r.content)
-        payload = jws.verify(token, cert.public_key(), algorithms=['ES256'])
-        return payload, header
-    raise ValueError("No certificate found in JWS headers")
+        if r.status_code == 200:
+            cert = x509.load_pem_x509_certificate(r.content)
+        else:
+            print(f"QR_SERVER: [!] Failed to fetch certificate from x5u: {r.status_code}")
+
+    if not cert:
+        raise ValueError("No certificate found in JWS headers or cache")
+
+    # Verify Signature
+    payload = jws.verify(token, cert.public_key(), algorithms=['ES256'])
+    
+    # Update Cache
+    if thumbprint and cert:
+        calculated_thumbprint = base64.urlsafe_b64encode(hashlib.sha256(cert.public_bytes(serialization.Encoding.DER)).digest()).rstrip(b'=').decode('ascii')
+        if calculated_thumbprint == thumbprint:
+            cache_path = os.path.join(CACHE_DIR, f"{thumbprint}.pem")
+            if not os.path.exists(cache_path):
+                with open(cache_path, "wb") as f:
+                    f.write(cert.public_bytes(serialization.Encoding.PEM))
+                print(f"QR_SERVER: Cached certificate {thumbprint}")
+
+    return payload, header
 
 def validate_jws_headers(header):
     """Validates iat, ttl, and crit list in JWS headers for security and spec compliance."""
@@ -240,7 +273,7 @@ def fetch_payload(payload_id):
     # Validate JWS headers (including 'crit' enforcement)
     is_valid, error_msg = validate_jws_headers(incoming_headers)
     if not is_valid:
-        print(f"[!] JWS Header Validation Error: {error_msg}")
+        print(f"QR_SERVER: [!] JWS Header Validation Error: {error_msg}")
         body = {"statusCode": 400, "error": error_msg}
         return sign_jws(body, private_key_pem, incoming_headers.get("correlationId"), is_fetch=True), 400, {'Content-Type': 'application/jose'}
 
@@ -249,16 +282,16 @@ def fetch_payload(payload_id):
         payload_bytes, _ = verify_jws(raw_data)
         claims = payload_bytes.decode('utf-8')
     except Exception as e:
-        print(f"[!] Signature Verification Failed for Fetch: {e}")
+        print(f"QR_SERVER: [!] Signature Verification Failed for Fetch: {e}")
         body = {"statusCode": 400, "error": "Invalid Signature"}
         return sign_jws(body, private_key_pem, incoming_headers.get("correlationId"), is_fetch=True), 400, {'Content-Type': 'application/jose'}
 
-    print(f"\n[*] Incoming Fetch Request for ID: {payload_id}")
-    print(f"[*] JWS Headers: {json.dumps(incoming_headers, indent=2)}")
+    print(f"\nQR_SERVER: [*] Incoming Fetch Request for ID: {payload_id}")
+    print(f"QR_SERVER: [*] JWS Headers: {json.dumps(incoming_headers, indent=2)}")
     try:
-        print(f"[*] JWS Body: {json.dumps(json.loads(claims), indent=2)}")
+        print(f"QR_SERVER: [*] JWS Body: {json.dumps(json.loads(claims), indent=2)}")
     except:
-        print(f"[*] JWS Body: {claims}")
+        print(f"QR_SERVER: [*] JWS Body: {claims}")
 
     payload_path = os.path.join(PAYLOAD_DIR, f"{payload_id}.json")
     if not os.path.exists(payload_path):
@@ -271,7 +304,7 @@ def fetch_payload(payload_id):
         payload_data = json.load(f)
 
     if payload_data.get("id") != payload_id:
-        print(f"[!] ID mismatch: Requested {payload_id}, found {payload_data.get('id')}")
+        print(f"QR_SERVER: [!] ID mismatch: Requested {payload_id}, found {payload_data.get('id')}")
         body = {"statusCode": 404, "error": "Payload ID mismatch"}
         validate_against_spec(body, "SignedStatusCodePayload")
         signed_err = sign_jws(body, private_key_pem, incoming_headers.get("correlationId"), is_fetch=True)
@@ -296,20 +329,20 @@ def receive_notification(payload_id):
     # Validate JWS headers (including 'crit' enforcement)
     is_valid, error_msg = validate_jws_headers(incoming_headers)
     if not is_valid:
-        print(f"[!] JWS Header Validation Error: {error_msg}")
+        print(f"QR_SERVER: [!] JWS Header Validation Error: {error_msg}")
         body = {"statusCode": 400, "error": error_msg}
         return sign_jws(body, private_key_pem, incoming_headers.get("correlationId")), 400, {'Content-Type': 'application/jose'}
 
-    print(f"\n[*] Incoming Notification Request for ID: {payload_id}")
-    print(f"[*] JWS Headers: {json.dumps(incoming_headers, indent=2)}")
+    print(f"\nQR_SERVER: [*] Incoming Notification Request for ID: {payload_id}")
+    print(f"QR_SERVER: [*] JWS Headers: {json.dumps(incoming_headers, indent=2)}")
     try:
         claims = jws.get_unverified_claims(raw_data)
         try:
-            print(f"[*] JWS Body: {json.dumps(json.loads(claims), indent=2)}")
+            print(f"QR_SERVER: [*] JWS Body: {json.dumps(json.loads(claims), indent=2)}")
         except:
-            print(f"[*] JWS Body: {claims}")
+            print(f"QR_SERVER: [*] JWS Body: {claims}")
     except:
-        print(f"[*] Raw Body: {raw_data}")
+        print(f"QR_SERVER: [*] Raw Body: {raw_data}")
 
     payload_path = os.path.join(PAYLOAD_DIR, f"{payload_id}.json")
     if not os.path.exists(payload_path):
@@ -334,7 +367,7 @@ def receive_notification(payload_id):
         if SANCTIONED_WALLET:
             payer_addr = data.get("payer", {}).get("fromAddress")
             if payer_addr and str(payer_addr).lower() == SANCTIONED_WALLET.lower():
-                print(f"[!] Security Alert: Payment blocked from sanctioned wallet {payer_addr}")
+                print(f"QR_SERVER: [!] Security Alert: Payment blocked from sanctioned wallet {payer_addr}")
                 body = {"statusCode": 403, "error": "Sanctioned wallet"}
                 return sign_jws(body, private_key_pem, incoming_headers.get("correlationId")), 403, {'Content-Type': 'application/jose'}
 
@@ -344,7 +377,7 @@ def receive_notification(payload_id):
         return signed_resp, 200, {'Content-Type': 'application/jose'}
 
     except Exception as e:
-        print(f"\n[!] Error processing JWS: {e}")
+        print(f"\nQR_SERVER: [!] Error processing JWS: {e}")
         body = {"statusCode": 400, "error": "Invalid Request or Signature"}
         return sign_jws(body, private_key_pem, incoming_headers.get("correlationId")), 400, {'Content-Type': 'application/jose'}
 
@@ -356,6 +389,7 @@ if __name__ == "__main__":
     parser.add_argument("--failiat", action="store_true", help="Intentionally return an iat from 11 minutes ago.")
     parser.add_argument("--failttl", action="store_true", help="Intentionally return an expired ttl.")
     parser.add_argument("--sanctionedWallet", help="Blockchain address to sanction/block.")
+    parser.add_argument("--x5c", action="store_true", help="Include x5c header and remove x5t#S256.")
     args = parser.parse_args()
 
     FAIL_SIGNATURE = args.failSignature
@@ -364,8 +398,9 @@ if __name__ == "__main__":
     FAIL_IAT = args.failiat
     FAIL_TTL = args.failttl
     SANCTIONED_WALLET = args.sanctionedWallet
+    USE_X5C = args.x5c
 
     if load_data():
-        print(f"[*] Starting Payee Server at http://{HOST}:{PORT}...")
+        print(f"QR_SERVER: [*] Starting Payee Server at http://{HOST}:{PORT}...")
         # Binding to 127.0.0.1 ensures compatibility with both localhost and 127.0.0.1 access
         app.run(host='127.0.0.1', port=PORT, debug=False, use_reloader=False)

@@ -2,6 +2,7 @@
 # Purpose: Utility to clean up generated QR codes and payloads.
 
 import os
+from datetime import datetime
 
 PAYEE_DB = "payee_db/qrs"
 PAYER_DB = "payer_db/qrs"
@@ -15,8 +16,9 @@ def get_qr_sets():
             if f.endswith(".json"):
                 txn_id = f[:-5]
                 if txn_id not in qr_sets:
-                    qr_sets[txn_id] = {'files': []}
+                    qr_sets[txn_id] = {'files': [], 'in_payee': False, 'in_payer': False}
                 qr_sets[txn_id]['files'].append(os.path.join(PAYEE_DB, f))
+                qr_sets[txn_id]['in_payee'] = True
                 qr_sets[txn_id]['display'] = txn_id # Default display
 
     # Check Payer DB (TXT and PNG)
@@ -32,10 +34,11 @@ def get_qr_sets():
                      txn_id = os.path.splitext(f)[0]
 
                 if txn_id not in qr_sets:
-                    qr_sets[txn_id] = {'files': []}
+                    qr_sets[txn_id] = {'files': [], 'in_payee': False, 'in_payer': False}
                     qr_sets[txn_id]['display'] = os.path.splitext(f)[0]
                 
                 qr_sets[txn_id]['files'].append(os.path.join(PAYER_DB, f))
+                qr_sets[txn_id]['in_payer'] = True
                 # Update display name if we found a more descriptive one (from payer db)
                 if ' - ' in f:
                      qr_sets[txn_id]['display'] = os.path.splitext(f)[0]
@@ -71,7 +74,18 @@ def main():
 
         print("\nExisting QR Codes:")
         for i, item in enumerate(sorted_qrs, 1):
-            print(f"{i}. {item['data'].get('display', item['id'])}")
+            data = item['data']
+            loc = ""
+            if data['in_payee'] and data['in_payer']:
+                loc = "[Both]"
+            elif data['in_payee']:
+                loc = "[Payee]"
+            else:
+                loc = "[Payer]"
+            
+            date_str = datetime.fromtimestamp(item['mtime']).strftime('%Y-%m-%d %H:%M')
+            
+            print(f"{i}. {date_str} {loc:8} {data.get('display', item['id'])}")
 
         choice = input("\nWhich one do you want to delete? (q to quit) ").strip()
         

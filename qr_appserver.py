@@ -16,6 +16,7 @@ import requests
 import yaml
 import argparse
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 from jose import jws
 from cryptography import x509
 from cryptography.hazmat.primitives import serialization
@@ -24,6 +25,7 @@ import referencing
 from referencing.jsonschema import DRAFT7
 
 app = Flask(__name__)
+CORS(app)
 PORT = 5010
 CACHE_DIR = "payer_db/cache"
 USE_X5C = False

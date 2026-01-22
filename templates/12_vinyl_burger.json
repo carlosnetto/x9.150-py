@@ -1,60 +1,75 @@
 {
     "creditor": {
-        "name": "The Golden Fork",
-        "phone": "+14155550002",
-        "email": "reservations@goldenfork.com",
+        "name": "Intuit",
+        "phone": "+123456789",
+        "email": "intuit@intuit.com",
         "address": {
-            "line1": "456 Elegant Way",
-            "city": "New York",
-            "state": "NY",
-            "postalCode": "10001",
+            "line1": "123 Main St",
+            "city": "Anytown",
+            "state": "CA",
+            "postalCode": "12345",
             "country": "US"
+        },
+        "ultimateCreditor": {
+            "account": {
+                "id": "@vinylburger",
+                "schemaname": "Intuit Tag"
+            },
+            "name": "Vinyl Burger",
+            "phone": "+5511999999999",
+            "email": "best@vinylburger.com",
+            "address": {
+                "line1": "Rua R. Padre Carvalho, 18",
+                "city": "Sao Paulo",
+                "state": "SP",
+                "postalCode": "05427-020",
+                "country": "BR"
+            }
         },
         "MCC": "5812"
     },
     "bill": {
         "paymentTiming": "immediate",
-        "description": "Fine dining experience at The Golden Fork",
+        "description": "Lunch at Vinyl Burger",
         "order": {
-            "number": "FD-2026-002",
-            "date": "2026-01-16"
+            "number": "VB-2026-006",
+            "date": "2026-02-16"
         },
         "amountDue": {
-            "amount": 6500,
+            "amount": 999,
             "currency": "USD"
         },
         "tip": {
             "allowed": true,
             "range": {
                 "min": 0,
-                "max": 35
+                "max": 25
             },
             "presets": [
-                18,
-                22,
-                25,
-                30
+                10,
+                13,
+                15
             ]
         }
     },
     "additionalInformation": [
         {
-            "key": "Wagyu Steak",
-            "value": "55.00"
+            "key": "Combo #1",
+            "value": "9.00"
         },
         {
-            "key": "Vintage Bordeaux",
-            "value": "5.00"
+            "key": "Fries",
+            "value": "0.00"
         },
         {
-            "key": "Truffle Risotto",
-            "value": "5.00"
+            "key": "Coke",
+            "value": "0.00"
         }
     ],
     "paymentMethods": [
         {
             "currency": "USD",
-            "amount": 6500,
+            "amount": 999,
             "networks": {
                 "FedNow": {
                     "routingNumber": "123456789",
@@ -70,7 +85,7 @@
         },
         {
             "currency": "USDC",
-            "amount": 65000000,
+            "amount": 9990000,
             "networks": {
                 "Base": {
                     "address": "0xa6d0AeFeB0427E0011003BFD8486f7b12b8C2ceb"
@@ -79,10 +94,10 @@
         },
         {
             "currency": "BRL",
-            "amount": 32500,
+            "amount": 5200,
             "networks": {
                 "Pix": {
-                    "key": "carlos.netto@gmail.com"
+                    "key": "vinylburger@gmail.com"
                 }
             }
         }

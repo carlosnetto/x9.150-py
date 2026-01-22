@@ -32,12 +32,12 @@
             }
         },
         "amountDue": {
-            "amount": 15500,
+            "amount": 7500,
             "currency": "USD",
             "adjustments": [
                 {
                     "explanation": "10% fee for late payment",
-                    "amount": 1550
+                    "amount": 750
                 }
             ]
         },

@@ -37,13 +37,29 @@ def format_field_name(name):
     return ' '.join(formatted_words)
 
 def extract_max_length(schema):
-    """Extracts the maximum length from maxLength or falls back to parsing the regex pattern."""
+    """Extracts the maximum length from maxLength, numeric maximum, type defaults, or falls back to parsing the regex pattern."""
     # 1. Direct attribute check
     max_len = schema.get("maxLength")
     if max_len is not None:
         return str(max_len)
 
-    # 2. Regex pattern parsing fallback
+    # 2. Numeric maximum check
+    # If a maximum is defined (common for numeric tags like revision), use its string length.
+    maximum = schema.get("maximum")
+    if maximum is not None:
+        return str(len(str(maximum)))
+
+    # 3. Type-based defaults for integers (largest possible value for the format)
+    if schema.get("type") == "integer":
+        fmt = schema.get("format")
+        if fmt == "uint64":
+            return "20"  # Max: 18,446,744,073,709,551,615
+        elif fmt == "int64":
+            return "19"  # Max: 9,223,372,036,854,775,807
+        else:
+            return "10"  # Max: 2,147,483,647 (Standard 32-bit integer)
+
+    # 4. Regex pattern parsing fallback
     pattern = schema.get("pattern")
     if pattern:
         # Find all quantifiers like {n} or {m,n}
@@ -88,6 +104,7 @@ def get_info(schema, spec):
         "date-time": "UTC Timestamp",
         "uri": "URL",
         "email": "e-mail",
+        "uint64": "Uint64",
         "int64": "Int64",
         "int32": "Integer"
     }

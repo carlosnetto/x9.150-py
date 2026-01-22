@@ -24,6 +24,8 @@ components:
         revision:
           type: integer
           description: "Sequence number used to track updates to the payment request. Incremented when details change. Starts with 0"
+          minimum: 0
+          maximum: 99
           example: 0
         qrCodeContent:
           type: string
@@ -143,6 +145,7 @@ components:
     Email:
       type: string
       format: email
+      maxLength: 254
       pattern: '^[a-zA-Z0-9.!#$%&''*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$'
       description: "Standard email address format as per RFC 5322 (Internet Message Format) for contact and billing inquiries. Supports sub-addressing (e.g., user+tag@domain.com)."
 
@@ -169,7 +172,7 @@ components:
 
     MonetaryAmount:
       type: integer
-      format: int64
+      format: uint64
       minimum: 0
       description: >
         A positive integer representing the absolute amount in the minor unit of the currency (e.g., cents for USD). 

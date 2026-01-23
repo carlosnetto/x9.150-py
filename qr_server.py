@@ -31,7 +31,6 @@ app = Flask(__name__)
 
 # In-memory state (loaded from file)
 private_key_pem = None
-payee_cert_b64 = None
 payer_public_key = None
 payee_thumbprint = None
 jwk_metadata = {}
@@ -41,7 +40,6 @@ FAIL_JWS_CUSTOM = False
 FAIL_IAT = False
 FAIL_TTL = False
 SANCTIONED_WALLET = None
-USE_X5C = False
 
 def validate_against_spec(data, schema_name):
     """Validates JSON against the OpenAPI spec. Required for spec validation testing."""
@@ -77,13 +75,11 @@ def load_data():
         print("QR_SERVER: [!] Error: payee_key.txt not found. Run keygen.py first.")
         return False
 
-    # 2. Load the Certificate for x5c (to avoid extra HTTP hits)
+    # 2. Load the Certificate to calculate thumbprint (x5t#S256)
     try:
         with open("payee_db/certs/payee_cert.pem", "rb") as f:
             cert_data = f.read()
             cert = x509.load_pem_x509_certificate(cert_data)
-            # x5c requires DER format, then standard Base64 encoding
-            payee_cert_b64 = base64.b64encode(cert.public_bytes(serialization.Encoding.DER)).decode('utf-8')
             
             # Calculate SHA256 thumbprint (x5t#S256) directly from the certificate
             cert_der = cert.public_bytes(serialization.Encoding.DER)
@@ -144,19 +140,15 @@ def sign_jws(payload, key_pem, correlation_id=None, is_fetch=False):
     headers = {
         "alg": "ES256", # ECDSA using P-256 and SHA-256
         "typ": "payresp+jws", # X9.150 specific type for payment responses
-        "x5u": jwk_metadata.get("x5u"), # Kept as a standard fallback
+        "jku": jwk_metadata.get("jku"),
         "kid": jwk_metadata.get("kid"),
         "iat": iat, # Issued At: Prevents replay attacks
         "ttl": ttl_val, # Time To Live: Ensures the message is fresh
         # correlationId: Links the response to the original request for non-repudiation
         "correlationId": effective_correlation_id,
-        "crit": ["correlationId", "iat", "ttl"]
+        "crit": ["correlationId", "iat", "ttl"],
+        "x5t#S256": payee_thumbprint
     }
-
-    if USE_X5C:
-        headers["x5c"] = [payee_cert_b64]
-    else:
-        headers["x5t#S256"] = payee_thumbprint
 
     if FAIL_JWS_CUSTOM:
         fields = ["iat", "ttl", "correlationId"]
@@ -182,7 +174,7 @@ def sign_jws(payload, key_pem, correlation_id=None, is_fetch=False):
     return token
 
 def verify_jws(token):
-    """Verifies a JWS using cache, x5c (embedded), or x5u (remote)."""
+    """Verifies a JWS using cache or jku (remote)."""
     header = jws.get_unverified_header(token)
     thumbprint = header.get("x5t#S256")
     cert = None
@@ -195,19 +187,25 @@ def verify_jws(token):
             with open(cache_path, "rb") as f:
                 cert = x509.load_pem_x509_certificate(f.read())
 
-    # 2. Try x5c (Embedded Certificate)
-    if not cert and 'x5c' in header:
-        cert_der = base64.b64decode(header['x5c'][0])
-        cert = x509.load_der_x509_certificate(cert_der)
-        
-    # 3. Try x5u (Certificate URL)
-    if not cert and 'x5u' in header:
-        print(f"QR_SERVER: Fetching certificate from {header['x5u']}")
-        r = requests.get(header['x5u'])
+    # 2. Try jku (JWK Set URL)
+    if not cert and 'jku' in header:
+        print(f"QR_SERVER: Fetching certificate from {header['jku']}")
+        r = requests.get(header['jku'])
         if r.status_code == 200:
-            cert = x509.load_pem_x509_certificate(r.content)
+            try:
+                # Try to parse as JWKS first
+                jwks = r.json()
+                for key in jwks.get("keys", []):
+                    if key.get("kid") == header.get("kid") and "x5c" in key:
+                        cert_der = base64.b64decode(key["x5c"][0])
+                        cert = x509.load_der_x509_certificate(cert_der)
+                        break
+            except (json.JSONDecodeError, ValueError):
+                # Fallback to raw PEM if it's not JSON
+                cert = x509.load_pem_x509_certificate(r.content)
+                
         else:
-            print(f"QR_SERVER: [!] Failed to fetch certificate from x5u: {r.status_code}")
+            print(f"QR_SERVER: [!] Failed to fetch certificate from jku: {r.status_code}")
 
     if not cert:
         raise ValueError("No certificate found in JWS headers or cache")
@@ -389,7 +387,6 @@ if __name__ == "__main__":
     parser.add_argument("--failiat", action="store_true", help="Intentionally return an iat from 11 minutes ago.")
     parser.add_argument("--failttl", action="store_true", help="Intentionally return an expired ttl.")
     parser.add_argument("--sanctionedWallet", help="Blockchain address to sanction/block.")
-    parser.add_argument("--x5c", action="store_true", help="Include x5c header and remove x5t#S256.")
     args = parser.parse_args()
 
     FAIL_SIGNATURE = args.failSignature
@@ -398,7 +395,6 @@ if __name__ == "__main__":
     FAIL_IAT = args.failiat
     FAIL_TTL = args.failttl
     SANCTIONED_WALLET = args.sanctionedWallet
-    USE_X5C = args.x5c
 
     if load_data():
         print(f"QR_SERVER: [*] Starting Payee Server at http://{HOST}:{PORT}...")

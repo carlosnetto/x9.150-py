@@ -28,7 +28,6 @@ app = Flask(__name__)
 CORS(app)
 PORT = 5010
 CACHE_DIR = "payer_db/cache"
-USE_X5C = False
 QR_SERVER_BASE_URL = "http://127.0.0.1:5005"
 
 # --- Helper Functions (Copied/Adapted from qr_payer.py) ---
@@ -67,18 +66,17 @@ def load_payer_identity():
             cert_data = f.read()
             cert = x509.load_pem_x509_certificate(cert_data)
             cert_der = cert.public_bytes(serialization.Encoding.DER)
-            cert_b64 = base64.b64encode(cert_der).decode('utf-8')
             thumbprint = base64.urlsafe_b64encode(hashlib.sha256(cert_der).digest()).rstrip(b'=').decode('ascii')
         with open("payer_db/certs/payer.jwks", "r") as f:
             jwks = json.load(f)
-            x5u = jwks["keys"][0].get("x5u")
-        return private_pem, cert_b64, x5u, thumbprint
+            jku = jwks["keys"][0].get("jku")
+        return private_pem, jku, thumbprint
     except FileNotFoundError:
         print("QR_APPSERVER: [!] Error: Payer keys/certs not found.")
-        return None, None, None, None
+        return None, None, None
 
 def verify_jws(token):
-    """Verifies a JWS using cache, x5c, or x5u. Required to validate the signed response from the upstream qr_server."""
+    """Verifies a JWS using cache or jku. Required to validate the signed response from the upstream qr_server."""
     header = jws.get_unverified_header(token)
     thumbprint = header.get("x5t#S256")
     cert = None
@@ -90,14 +88,21 @@ def verify_jws(token):
             with open(cache_path, "rb") as f:
                 cert = x509.load_pem_x509_certificate(f.read())
 
-    if not cert and 'x5c' in header:
-        cert_der = base64.b64decode(header['x5c'][0])
-        cert = x509.load_der_x509_certificate(cert_der)
-        
-    if not cert and 'x5u' in header:
-        print(f"QR_APPSERVER: Fetching certificate from {header['x5u']}")
-        r = requests.get(header['x5u'])
-        cert = x509.load_pem_x509_certificate(r.content)
+    if not cert and 'jku' in header:
+        print(f"QR_APPSERVER: Fetching certificate from {header['jku']}")
+        r = requests.get(header['jku'])
+        if r.status_code == 200:
+            try:
+                # Try to parse as JWKS first
+                jwks = r.json()
+                for key in jwks.get("keys", []):
+                    if key.get("kid") == header.get("kid") and "x5c" in key:
+                        cert_der = base64.b64decode(key["x5c"][0])
+                        cert = x509.load_der_x509_certificate(cert_der)
+                        break
+            except (json.JSONDecodeError, ValueError):
+                # Fallback to raw PEM if it's not JSON
+                cert = x509.load_pem_x509_certificate(r.content)
 
     if not cert:
         raise ValueError("No certificate found in JWS headers or cache")
@@ -248,7 +253,7 @@ def fetch_payment_details():
     
     validate_against_spec(payload, "FetchRequestPayload")
 
-    private_key_pem, cert_b64, payer_x5u, payer_thumbprint = load_payer_identity()
+    private_key_pem, payer_jku, payer_thumbprint = load_payer_identity()
     if not private_key_pem:
         return jsonify({"error": "Server identity not configured"}), 500
 
@@ -257,18 +262,14 @@ def fetch_payment_details():
     headers = {
         "alg": "ES256",
         "typ": "payreq+jws",
-        "x5u": payer_x5u,
+        "jku": payer_jku,
         "kid": "payer-key-id-001",
         "iat": iat,
         "ttl": ttl,
         "correlationId": correlation_id,
-        "crit": ["iat", "ttl", "correlationId"]
+        "crit": ["iat", "ttl", "correlationId"],
+        "x5t#S256": payer_thumbprint
     }
-    
-    if USE_X5C:
-        headers["x5c"] = [cert_b64]
-    else:
-        headers["x5t#S256"] = payer_thumbprint
 
     token = jws.sign(payload, private_key_pem, headers=headers, algorithm='ES256')
 
@@ -312,7 +313,7 @@ def notify_payment():
     # Prepare JWS
     correlation_id = str(uuid.uuid4())
     
-    private_key_pem, cert_b64, payer_x5u, payer_thumbprint = load_payer_identity()
+    private_key_pem, payer_jku, payer_thumbprint = load_payer_identity()
     if not private_key_pem:
         return jsonify({"error": "Server identity not configured"}), 500
 
@@ -321,18 +322,14 @@ def notify_payment():
     headers = {
         "alg": "ES256",
         "typ": "payreq+jws",
-        "x5u": payer_x5u,
+        "jku": payer_jku,
         "kid": "payer-key-id-001",
         "iat": iat,
         "ttl": ttl,
         "correlationId": correlation_id,
-        "crit": ["iat", "ttl", "correlationId"]
+        "crit": ["iat", "ttl", "correlationId"],
+        "x5t#S256": payer_thumbprint
     }
-    
-    if USE_X5C:
-        headers["x5c"] = [cert_b64]
-    else:
-        headers["x5t#S256"] = payer_thumbprint
 
     token = jws.sign(data, private_key_pem, headers=headers, algorithm='ES256')
 
@@ -358,9 +355,7 @@ def notify_payment():
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="QR App Server")
-    parser.add_argument("--x5c", action="store_true", help="Include x5c header and remove x5t#S256.")
     args = parser.parse_args()
-    USE_X5C = args.x5c
 
     os.makedirs(CACHE_DIR, exist_ok=True)
     print(f"QR_APPSERVER: Starting App Server on port {PORT}...")

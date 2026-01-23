@@ -79,6 +79,10 @@ def generate_key_pair(name, cert_url_base, output_folder):
     cert_der = cert.public_bytes(serialization.Encoding.DER)
     thumbprint = hashlib.sha256(cert_der).digest()
     x5t_s256 = bytes_to_base64url(thumbprint)
+    
+    # 4.5 Prepare x5c (X.509 Certificate Chain)
+    # x5c is a base64-encoded (not urlsafe) DER certificate.
+    x5c_val = base64.b64encode(cert_der).decode('ascii')
 
     # 5. Extract Public Key components for JWK (x and y coordinates)
     # JSON Web Keys (JWK) represent ECC keys using their mathematical coordinates.
@@ -96,8 +100,9 @@ def generate_key_pair(name, cert_url_base, output_folder):
         "y": y,
         "use": "sig",
         "kid": f"{name}-key-id-001", # Unique identifier for the key
-        "x5u": f"{cert_url_base}/{name}_cert.pem", # URL where the certificate is hosted
+        "jku": f"{cert_url_base}/{name}.jwks", # URL where the JWKS is hosted
         "x5t#S256": x5t_s256, # Thumbprint for integrity check
+        "x5c": [x5c_val], # Embedded certificate to avoid extra HTTP hits
         "alg": "ES256"
     }
 

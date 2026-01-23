@@ -39,7 +39,7 @@ This proves that QR code payments can be open, interoperable, and secure, and th
 *   **X9.150 Payload**: Constructs the JSON Payment Payload with required fields (Section 6.2).
 *   **Security (JWS)** (Section 7):
     *   Signs outgoing payloads and notifications using `ES256`.
-    *   Supports **Hybrid Verification**: Uses `x5c` (embedded certificate) for performance and `x5u` (URL-based) for standard-compliant certificate retrieval.
+    *   Supports **JWKS-based Verification**: Uses `jku` (JWK Set URL) for certificate discovery and `x5t#S256` (Thumbprint) for efficient local caching and pinning.
 *   **Explicit Routing**: Uses dedicated paths for payload retrieval (`/fetch/`) and notifications (`/notify/`) instead of a single broker endpoint.
 *   **Tunneling Support**: Easily integrates with tunneling services like `pinggy.io` for external device testing.
 *   **Certificate Server**: Includes a dedicated service to host public keys and JWKS metadata.
@@ -64,7 +64,7 @@ python keygen.py
 ```
 
 ### 2. Start the Certificate Server
-Run the certificate server to host the public certificates. This allows the JWS `x5u` header to function correctly during verification.
+Run the certificate server to host the public certificates and JWKS metadata. This allows the JWS `jku` header to function correctly during verification.
 It serves files from both `payee_db/certs` and `payer_db/certs`.
 
 ```bash
@@ -115,7 +115,7 @@ This generates `openapi_flattened.csv`, providing a flattened view of all JSON p
 To understand the implementation, follow these files in order to see how the X9.150 trust chain is built:
 
 1.  **`keygen.py` (The Trust Setup)**: Generates Elliptic Curve (ECC) keys and X.509 certificates into `payee_db/certs` and `payer_db/certs`. In X9.150, identity is bound to these certificates. This simulates the enrollment of a Merchant or Bank into the payment network.
-2.  **`certserv.py` (The Certificate Repository)**: Hosts public certificates and JWKS metadata from the `*_db/certs` folders. When a Payer receives a signed message, they use the `x5u` (X.509 URL) header to fetch the certificate from this server to verify the signature.
+2.  **`certserv.py` (The Certificate Repository)**: Hosts public certificates and JWKS metadata from the `*_db/certs` folders. When a Payer receives a signed message, they use the `jku` (JWK Set URL) header to fetch the certificate from this server to verify the signature.
 3.  **`qr_generator.py` (The Merchant POS)**: Creates the EMVCo-compliant QR string. It saves the secure JSON payload to `payee_db/qrs` (for the server) and the QR code to `payer_db/qrs` (for the payer to scan).
 4.  **`qr_server.py` (The Payee Backend)**: The core logic. It loads keys from `payee_db/certs` and payloads from `payee_db/qrs`. It manages the `/fetch/` endpoint and the `/notify/` endpoint.
 5.  **`qr_payer.py` (The Wallet Simulator)**: Simulates the consumer's banking app. It scans QR codes from `payer_db/qrs` and loads its own identity from `payer_db/certs`. It performs the critical "Verification" step: checking the Merchant's JWS signature and validating the certificate before showing the "Pay" button to the user.
@@ -173,7 +173,7 @@ Used by a payer-side app to inform the merchant that a payment has been initiate
 
 ### The Security Handshake (JWS)
 The security of X9.150 relies on **JSON Web Signatures (JWS)**. Every exchange follows this pattern:
-*   **Protected Header**: Tells the receiver which certificate to use (`x5u` or `x5c`) and the algorithm (`ES256`).
+*   **Protected Header**: Tells the receiver which certificate to use (`jku`) and the algorithm (`ES256`). It also includes `x5t#S256` for efficient caching.
 *   **Payload**: The actual transaction data (Amount, Currency, Merchant ID).
 *   **Signature**: A cryptographic seal. If even one character in the payload is changed (e.g., changing $10.00 to $100.00), the signature verification will fail.
 

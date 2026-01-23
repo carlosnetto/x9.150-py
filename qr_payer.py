@@ -94,19 +94,17 @@ def load_payer_identity():
         with open("payer_db/certs/payer_cert.pem", "rb") as f:
             cert_data = f.read()
             cert = x509.load_pem_x509_certificate(cert_data)
-            # x5c requires DER format, then standard Base64 encoding
-            cert_b64 = base64.b64encode(cert.public_bytes(serialization.Encoding.DER)).decode('utf-8')
 
             # Calculate SHA256 thumbprint (x5t#S256)
             cert_der = cert.public_bytes(serialization.Encoding.DER)
             thumbprint = base64.urlsafe_b64encode(hashlib.sha256(cert_der).digest()).rstrip(b'=').decode('ascii')
             
-        # Load x5u from JWKS to include in our own headers
+        # Load jku from JWKS to include in our own headers
         with open("payer_db/certs/payer.jwks", "r") as f:
             jwks = json.load(f)
-            x5u = jwks["keys"][0].get("x5u")
+            jku = jwks["keys"][0].get("jku")
             
-        return private_pem, cert_b64, x5u, thumbprint
+        return private_pem, jku, thumbprint
     except FileNotFoundError:
         print("[!] Error: Payer keys/certs not found. Run keygen.py first.")
         return None, None, None
@@ -303,7 +301,7 @@ def pay_usdc_on_base(mnemonic, recipient_address, amount_to_pay):
         return None, None
 
 def verify_jws(token):
-    """Verifies a JWS using cache, x5c (embedded), or x5u (remote)."""
+    """Verifies a JWS using cache or jku (remote)."""
     header = jws.get_unverified_header(token)
     thumbprint = header.get("x5t#S256")
     cert = None
@@ -316,16 +314,21 @@ def verify_jws(token):
             with open(cache_path, "rb") as f:
                 cert = x509.load_pem_x509_certificate(f.read())
 
-    # 2. Try x5c (Embedded Certificate)
-    if not cert and 'x5c' in header:
-        cert_der = base64.b64decode(header['x5c'][0])
-        cert = x509.load_der_x509_certificate(cert_der)
-        
-    # 3. Try x5u (Certificate URL)
-    if not cert and 'x5u' in header:
-        print(f"PAYER: Fetching certificate from {header['x5u']}")
-        r = requests.get(header['x5u'])
-        cert = x509.load_pem_x509_certificate(r.content)
+    # 2. Try jku (JWK Set URL)
+    if not cert and 'jku' in header:
+        print(f"PAYER: Fetching certificate from {header['jku']}")
+        r = requests.get(header['jku'])
+        if r.status_code == 200:
+            try:
+                # Try to parse as JWKS
+                jwks = r.json()
+                for key in jwks.get("keys", []):
+                    if key.get("kid") == header.get("kid") and "x5c" in key:
+                        cert_der = base64.b64decode(key["x5c"][0])
+                        cert = x509.load_der_x509_certificate(cert_der)
+                        break
+            except (json.JSONDecodeError, ValueError):
+                cert = x509.load_pem_x509_certificate(r.content)
 
     if not cert:
         raise ValueError("No certificate found in JWS headers or cache")
@@ -426,7 +429,7 @@ def log_server_error(resp):
             pass
     print(content)
 
-def run_payer(fail_sig=False, fail_jws_custom=False, fail_iat=False, fail_ttl=False, use_x5c=False):
+def run_payer(fail_sig=False, fail_jws_custom=False, fail_iat=False, fail_ttl=False):
     global FAIL_SIGNATURE
     FAIL_SIGNATURE = fail_sig
     # The Payer (Wallet) flow:
@@ -494,7 +497,7 @@ def run_payer(fail_sig=False, fail_jws_custom=False, fail_iat=False, fail_ttl=Fa
 
     # 4. Generate keys and sign as JWS
     print("[*] Loading Payer identity and signing request...")
-    private_key_pem, payer_cert_b64, payer_x5u, payer_thumbprint = load_payer_identity()
+    private_key_pem, payer_jku, payer_thumbprint = load_payer_identity()
     if not private_key_pem:
         return
     
@@ -512,18 +515,14 @@ def run_payer(fail_sig=False, fail_jws_custom=False, fail_iat=False, fail_ttl=Fa
     headers = {
         "alg": "ES256",
         "typ": "payreq+jws",
-        "x5u": payer_x5u,
+        "jku": payer_jku,
         "kid": "payer-key-id-001",
         "iat": iat,
         "ttl": ttl,
         "correlationId": correlation_id,
-        "crit": ["iat", "ttl", "correlationId"]
+        "crit": ["iat", "ttl", "correlationId"],
+        "x5t#S256": payer_thumbprint
     }
-    
-    if use_x5c:
-        headers["x5c"] = [payer_cert_b64]
-    else:
-        headers["x5t#S256"] = payer_thumbprint
     
     if FAIL_JWS_CUSTOM:
         fields = ["iat", "ttl", "correlationId"]
@@ -687,7 +686,6 @@ if __name__ == "__main__":
     parser.add_argument("--failjwscustom", action="store_true", help="Intentionally omit mandatory JWS headers (iat, ttl, correlationId) randomly.")
     parser.add_argument("--failiat", action="store_true", help="Intentionally send an iat from 11 minutes ago.")
     parser.add_argument("--failttl", action="store_true", help="Intentionally send an expired ttl.")
-    parser.add_argument("--x5c", action="store_true", help="Include x5c header and remove x5t#S256.")
     args = parser.parse_args()
 
-    run_payer(fail_sig=args.failSignature, fail_jws_custom=args.failjwscustom, fail_iat=args.failiat, fail_ttl=args.failttl, use_x5c=args.x5c)
+    run_payer(fail_sig=args.failSignature, fail_jws_custom=args.failjwscustom, fail_iat=args.failiat, fail_ttl=args.failttl)

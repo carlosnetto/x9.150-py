@@ -65,6 +65,7 @@ components:
         additionalInformation:
           type: array
           description: "A collection of key-value pairs for extended metadata not covered by the standard schema."
+          minItems: 1
           items:
             $ref: '#/components/schemas/AdditionalInfo'
         paymentMethods:
@@ -412,7 +413,18 @@ components:
       required:
         - paymentTiming
         - amountDue
-        - tip
+      oneOf:
+        - properties:
+            paymentTiming:
+              enum: [immediate]
+        - properties:
+            paymentTiming:
+              enum: [deferred]
+            invoice:
+              required:
+                - dueDate
+          required:
+            - invoice
 
     Invoice:
       description: "Formal billing document details."
@@ -499,6 +511,9 @@ components:
               type: integer
               minimum: 0
               maximum: 999
+          required:
+            - min
+            - max
         presets:
           type: array
           minItems: 1
@@ -531,6 +546,9 @@ components:
           type: string
           maxLength: 218
           pattern: '^[ -~]*$'
+      required:
+        - key
+        - value
 
     TraditionalNetworkDetails:
       type: object
@@ -576,6 +594,11 @@ components:
                   $ref: '#/components/schemas/MonetaryAmount'
                 max:
                   $ref: '#/components/schemas/MonetaryAmount'
+              required:
+                - min
+                - max
+          required:
+            - range
         networks:
           type: object
           description: "A map of payment networks and their specific routing details. Explicitly supports FedNow, RTP, and ACH, while allowing other networks via additional properties."

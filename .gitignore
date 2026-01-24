@@ -15,3 +15,4 @@ wallet_keys.txt
 openapi_flattened.csv
 payer_db/
 payee_db/
+test_data/

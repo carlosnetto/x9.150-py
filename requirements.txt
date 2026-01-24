@@ -9,5 +9,7 @@ cryptography
 requests
 web3
 jsonschema
-PyYAML
 flask-cors
+openapi-schema-validator>=0.6.0
+PyYAML>=6.0.1
+rfc3339-validator>=0.1.4

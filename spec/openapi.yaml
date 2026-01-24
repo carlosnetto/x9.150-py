@@ -32,13 +32,13 @@ components:
           pattern: '^[a-zA-Z0-9_-]{0,1024}$'
           description: "The raw string content obtained from scanning the QR code, encoded in base64url. Note: In the EMV QR structure, Tag 26 Subtag 01 omits the protocol and the '://' separator (e.g., 'bank.com/fetch/uid') to save space and assumes https://. This allows the Payer to verify that the scanned QR code matches the one linked to this JSON payload."
         createdAt:
-          description: "The moment the payment request record was first generated."
+          description: "The moment the payment request record was first generated. SHALL be a UTC timestamp. For the initial version (revision = 0), createdAt SHALL equal revisedAt. In all cases, createdAt SHALL be less than or equal to revisedAt and sentAt."
           $ref: '#/components/schemas/Timestamp'
         revisedAt:
-          description: "The timestamp of the last modification to this payment request."
+          description: "The timestamp of the last modification to this payment request. SHALL be greater than or equal to createdAt."
           $ref: '#/components/schemas/Timestamp'
         sentAt:
-          description: "The timestamp when the request was dispatched to the payer or payer's PSP. It's updated every time the API is requested."
+          description: "The timestamp when the request was dispatched to the payer or payer's PSP. It's updated every time the API is requested. SHALL be greater than or equal to createdAt."
           $ref: '#/components/schemas/Timestamp'
         validUntil:
           description: "The expiration timestamp after which the QR code should no longer be accepted for processing. If this time passes, the Payer PSP should fetch the payload again; a new revision may be returned with updated adjustments (e.g., late fees) and an extended validUntil."
@@ -73,10 +73,18 @@ components:
           description: "List of supported payment rails and currencies available for this request."
           items:
             $ref: '#/components/schemas/PaymentMethod'
-        statusCode:
-          type: integer
-          description: "HTTP status code echoed in the payload for non-repudiation."
-          example: 200
+      required:
+        - id
+        - revision
+        - qrCodeContent
+        - createdAt
+        - revisedAt
+        - sentAt
+        - validUntil
+        - status
+        - creditor
+        - bill
+        - paymentMethods
 
     PaymentStatus:
       description: >
@@ -279,6 +287,8 @@ components:
           $ref: '#/components/schemas/MCC'
       required:
         - MCC
+        - name
+        - address
 
     UltimateCreditor:
       description: "The final beneficiary of the funds, if different from the Creditor (e.g., a sub-merchant in a marketplace)."
@@ -298,6 +308,9 @@ components:
               maxLength: 70
               pattern: '^[ -~]*$'
               description: "Name of the schema within that creditor (ex.: $cashTag, e-mail, etc.)"
+            required:
+              - id
+              - schemaName
         name:
           type: string
           maxLength: 50
@@ -309,6 +322,10 @@ components:
           $ref: '#/components/schemas/Email'
         address:
           $ref: '#/components/schemas/Address'
+      required:
+        - name
+        - account
+        - address
 
     Address:
       description: "Geographic location details for an entity."
@@ -334,6 +351,9 @@ components:
           maxLength: 30
           pattern: '^[ -~]*$'
           example: "NY"
+      required:
+        - city
+        - country
       anyOf:
         - title: US Address
           properties:
@@ -391,6 +411,8 @@ components:
           $ref: '#/components/schemas/Tip'
       required:
         - paymentTiming
+        - amountDue
+        - tip
 
     Invoice:
       description: "Formal billing document details."
@@ -434,6 +456,9 @@ components:
           description: "Discounts, surcharges, or taxes applied to the base amount."
           items:
             $ref: '#/components/schemas/Adjustment'
+      required:
+        - amount
+        - currency
 
     Adjustment:
       description: "A modification to the total amount (e.g., an early payment discount)."
@@ -451,6 +476,10 @@ components:
             - $ref: '#/components/schemas/Timestamp'
           description: >
             The last millisecond this adjustment is valid. If the QR code is not paid by this time, a new fetch is required to update the payload with current conditions (e.g., to include late fees).
+      required:
+        - explanation
+        - amount
+        - validUntil
 
     Tip:
       description: "Configuration for optional gratuity."
@@ -472,11 +501,23 @@ components:
               maximum: 999
         presets:
           type: array
+          minItems: 1
+          maxItems: 10
           description: "Suggested tip percentages for the UI."
           items:
             type: integer
             minimum: 0
             maximum: 999
+      required:
+        - allowed
+      oneOf:
+        - properties:
+            allowed:
+              enum: [false]
+        - properties:
+            allowed:
+              enum: [true]
+          required: [range]
 
     AdditionalInfo:
       description: "Generic metadata container."
@@ -506,10 +547,13 @@ components:
           description: "The specific account number at the institution."
         protectionType:
           type: string
-          maxLength: 15
-          pattern: '^[ -~]*$'
-          description: "The security mechanism used (e.g., 'tokenized', 'cleartext')."
-
+          enum: [tokenized, encrypted, plaintext]
+          description: "The security mechanism used to protect the account details."
+      required:
+        - routingNumber
+        - accountNumber
+        - protectionType
+        
     PaymentMethod:
       description: "Defines a specific currency and network combination for fulfilling the payment."
       type: object
@@ -542,5 +586,9 @@ components:
               $ref: '#/components/schemas/TraditionalNetworkDetails'
             ACH:
               $ref: '#/components/schemas/TraditionalNetworkDetails'
-          additionalProperties:
-            true
+          additionalProperties: true
+      required:
+        - currency
+        - amount
+        - validUntil
+        - networks

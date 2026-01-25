@@ -190,48 +190,4 @@ The security of X9.150 relies on **JSON Web Signatures (JWS)**. Every exchange f
 *   **Protected Header**: Tells the receiver which certificate to use (`jku`) and the algorithm (`ES256`). It also includes `x5t#S256` for efficient caching.
 *   **Payload**: The actual transaction data (Amount, Currency, Merchant ID).
 *   **Signature**: A cryptographic seal. If even one character in the payload is changed (e.g., changing $10.00 to $100.00), the signature verification will fail.
-
----
-
-1.  **Startup**: The script generates an ECC key pair (simulating the Payee PSP's keys).
-2.  **QR Generation**: It creates a unique Transaction ID and embeds the URL (`https://<domain>/fetch/<id>`) into the EMV QR string.
-3.  **Image Creation**: Saves the QR code as `qrcode.png`.
-4.  **Server**: Starts a Flask server listening for POST requests.
-
-### API Endpoints
-The server provides two primary endpoints for the payment flow:
-
-1.  **Payment Payload Request (`/fetch/<payload_id>`)**:
-    *   **Trigger**: The Payer App scans the QR and sends a POST request containing a JWS with `qrCodeContent`.
-    *   **Action**: The server returns the signed Payment Payload (JWS).
-
-2.  **Payment Notification (`/notify/<payload_id>`)**:
-    *   **Trigger**: The Payer PSP sends a POST request containing a JWS with a `payment` object (confirming the transaction).
-    *   **Action**: The server verifies the signature using the Payer's public key (simulated) and prints the notification details to the console. It returns a signed JWS with `statusCode: 200`.
-
-## Testing with cURL
-
-You can simulate the Payer PSP using `curl` against the specific endpoints.
-
-**1. Request the Payment Payload:**
-*(Simulates scanning the QR code)*
-
-```bash
-# Replace <URL> with the URL printed by the script
-curl -X POST <URL> \
-     -H "Content-Type: application/jose" \
-     -d '<header>.<payload-with-qrCodeContent-base64url>.<signature>'
-```
-
-**2. Send a Payment Notification:**
-*(Simulates confirming the payment)*
-
-```bash
-# Replace <URL> with the URL printed by the script
-curl -X POST <URL> \
-     -H "Content-Type: application/jose" \
-     -d '<header>.<payload-with-paymentNotification>.<signature>'
-```
-
-*Note: The script currently accepts unverified JWS extraction for the purpose of determining the request type in this simulation, but enforces signature verification for the final processing of notifications.*
 ```

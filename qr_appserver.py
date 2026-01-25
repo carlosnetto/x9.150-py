@@ -15,7 +15,7 @@ import hashlib
 import requests
 import yaml
 import argparse
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from jose import jws
 from cryptography import x509
@@ -29,6 +29,7 @@ CORS(app)
 PORT = 5010
 CACHE_DIR = "payer_db/cache"
 QR_SERVER_BASE_URL = "http://127.0.0.1:5005"
+STATIC_ROOT = None
 
 # --- Helper Functions (Copied/Adapted from qr_payer.py) ---
 
@@ -62,14 +63,11 @@ def load_payer_identity():
     try:
         with open("payer_db/certs/payer_key.txt", "rb") as f:
             private_pem = f.read()
-        with open("payer_db/certs/payer_cert.pem", "rb") as f:
-            cert_data = f.read()
-            cert = x509.load_pem_x509_certificate(cert_data)
-            cert_der = cert.public_bytes(serialization.Encoding.DER)
-            thumbprint = base64.urlsafe_b64encode(hashlib.sha256(cert_der).digest()).rstrip(b'=').decode('ascii')
         with open("payer_db/certs/payer.jwks", "r") as f:
             jwks = json.load(f)
-            jku = jwks["keys"][0].get("jku")
+            key = jwks["keys"][0]
+            jku = key.get("jku")
+            thumbprint = key.get("x5t#S256")
         return private_pem, jku, thumbprint
     except FileNotFoundError:
         print("QR_APPSERVER: [!] Error: Payer keys/certs not found.")
@@ -353,9 +351,24 @@ def notify_payment():
         print(f"QR_APPSERVER: [!] Error during notify: {e}")
         return jsonify({"error": str(e)}), 500
 
+@app.route('/', defaults={'path': 'index.html'}, methods=['GET'])
+@app.route('/<path:path>', methods=['GET'])
+def serve_static(path):
+    if not STATIC_ROOT:
+        return jsonify({"error": "Static serving not configured. Use --root <folder>."}), 404
+    return send_from_directory(STATIC_ROOT, path)
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="QR App Server")
+    parser.add_argument("--root", help="Root folder for serving static files")
     args = parser.parse_args()
+
+    if args.root:
+        STATIC_ROOT = os.path.abspath(args.root)
+        if not os.path.exists(STATIC_ROOT):
+            print(f"QR_APPSERVER: [!] Error: Root folder '{STATIC_ROOT}' does not exist.")
+            sys.exit(1)
+        print(f"QR_APPSERVER: Serving static files from {STATIC_ROOT}")
 
     os.makedirs(CACHE_DIR, exist_ok=True)
     print(f"QR_APPSERVER: Starting App Server on port {PORT}...")

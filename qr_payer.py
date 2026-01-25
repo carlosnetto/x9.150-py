@@ -91,18 +91,11 @@ def load_payer_identity():
         with open("payer_db/certs/payer_key.txt", "rb") as f:
             private_pem = f.read()
         
-        with open("payer_db/certs/payer_cert.pem", "rb") as f:
-            cert_data = f.read()
-            cert = x509.load_pem_x509_certificate(cert_data)
-
-            # Calculate SHA256 thumbprint (x5t#S256)
-            cert_der = cert.public_bytes(serialization.Encoding.DER)
-            thumbprint = base64.urlsafe_b64encode(hashlib.sha256(cert_der).digest()).rstrip(b'=').decode('ascii')
-            
-        # Load jku from JWKS to include in our own headers
         with open("payer_db/certs/payer.jwks", "r") as f:
             jwks = json.load(f)
-            jku = jwks["keys"][0].get("jku")
+            key = jwks["keys"][0]
+            jku = key.get("jku")
+            thumbprint = key.get("x5t#S256")
             
         return private_pem, jku, thumbprint
     except FileNotFoundError:
@@ -169,6 +162,8 @@ def display_payload(payload):
     print("="*60)
     print(f"Description:    {bill.get('description', 'N/A')}")
     print(f"Payment Timing: {bill.get('paymentTiming', 'N/A')}")
+    if "invoice" in bill:
+        print(f"Due Date:       {bill['invoice'].get('dueDate', 'N/A')}")
     print(f"Amount Due:     {amt_due.get('amount')} {bill_currency}")
     
     adjustments = amt_due.get("adjustments", [])

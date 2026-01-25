@@ -6,6 +6,7 @@ import os
 import json
 import base64
 import hashlib
+import argparse
 from datetime import datetime, timedelta, timezone
 from cryptography.hazmat.primitives import serialization, hashes
 from cryptography.hazmat.primitives.asymmetric import ec
@@ -16,7 +17,7 @@ def bytes_to_base64url(data: bytes) -> str:
     """Helper to convert bytes to base64url encoding as required by JWK."""
     return base64.urlsafe_b64encode(data).rstrip(b'=').decode('ascii')
 
-def generate_key_pair(name, cert_url_base, output_folder):
+def generate_key_pair(name, cert_url_base, output_folder, create_pem=False):
     print(f"Generating keys for {name} in {output_folder}...")
 
     if not os.path.exists(output_folder):
@@ -62,8 +63,9 @@ def generate_key_pair(name, cert_url_base, output_folder):
     # Save Certificate as PEM (to be served by certserv.py later)
     # PEM is the text-based format (Base64) often used for web transmission.
     cert_pem = cert.public_bytes(serialization.Encoding.PEM)
-    with open(os.path.join(output_folder, f"{name}_cert.pem"), "wb") as f:
-        f.write(cert_pem)
+    if create_pem:
+        with open(os.path.join(output_folder, f"{name}_cert.pem"), "wb") as f:
+            f.write(cert_pem)
 
     # 3.5 Create a Certificate Signing Request (CSR)
     # This is what you would send to a Certificate Authority (CA) to get a real certificate.
@@ -111,11 +113,18 @@ def generate_key_pair(name, cert_url_base, output_folder):
     with open(os.path.join(output_folder, f"{name}.jwks"), "w") as f:
         json.dump(jwks, f, indent=4)
 
-    print(f"Successfully created keys in {output_folder}: {name}_key.txt, {name}_cert.pem, {name}.csr, and {name}.jwks")
+    files_created = [f"{name}_key.txt", f"{name}.csr", f"{name}.jwks"]
+    if create_pem:
+        files_created.append(f"{name}_cert.pem")
+    print(f"Successfully created keys in {output_folder}: {', '.join(files_created)}")
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Generate X9.150 Keys and Certificates")
+    parser.add_argument("--pem", action="store_true", help="Generate .pem certificate files")
+    args = parser.parse_args()
+
     # Arbitrary local URL for the certificate server
     BASE_URL = "http://localhost:5001"
     
-    generate_key_pair("payee", BASE_URL, "payee_db/certs")
-    generate_key_pair("payer", BASE_URL, "payer_db/certs")
+    generate_key_pair("payee", BASE_URL, "payee_db/certs", create_pem=args.pem)
+    generate_key_pair("payer", BASE_URL, "payer_db/certs", create_pem=args.pem)

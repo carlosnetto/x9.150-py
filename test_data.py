@@ -177,13 +177,7 @@ class X9150DataFactory:
         ref_id = random.randint(1000, 9999)
         methods = self._generate_payment_methods()
         now = self._get_timestamp()
-
-        # Tip logic: if allowed, range and presets are mandatory
-        tip_allowed = random.random() < 0.3  # 30% chance of allowing tips
-        tip_config = {"allowed": tip_allowed}
-        if tip_allowed:
-            tip_config["range"] = {"min": 0, "max": 300}  # 0% to 30.0%
-            tip_config["presets"] = [100, 150, 200]       # 10%, 15%, 20%
+        payment_timing = random.choice(["immediate", "deferred"])
 
         amount_due = {
             "amount": methods[0]["amount"],
@@ -197,6 +191,28 @@ class X9150DataFactory:
                 "validUntil": self._get_timestamp(offset_minutes=30)
             }]
 
+        bill = {
+            "description": sub_biz["unstructured"].format(ref=ref_id),
+            "paymentTiming": payment_timing,
+            "amountDue": amount_due
+        }
+
+        # Tip logic: if allowed, range and presets are mandatory
+        tip_allowed = random.random() < 0.3  # 30% chance of allowing tips
+        if tip_allowed:
+            bill["tip"] = {
+                "allowed": True,
+                "range": {"min": 0, "max": 30},  # 0% to 30.0%
+                "presets": [10, 15, 20]        # 10%, 15%, 20%
+            }
+        else:
+            bill["tip"] = {"allowed": False}
+
+        if payment_timing == "deferred":
+            bill["invoice"] = {
+                "dueDate": self._get_timestamp(offset_minutes=1440 * 7)
+            }
+
         return {
             "id": self._generate_uuid_no_dashes(),
             "revision": 0, # Initial version
@@ -208,12 +224,7 @@ class X9150DataFactory:
             "sentAt": now,
             "validUntil": self._get_timestamp(offset_minutes=60),
             "creditor": creditor,
-            "bill": {
-                "description": sub_biz["unstructured"].format(ref=ref_id),
-                "paymentTiming": random.choice(["immediate", "deferred"]),
-                "amountDue": amount_due,
-                "tip": tip_config
-            },
+            "bill": bill,
             "unstructured": sub_biz["unstructured"].format(ref=ref_id),
             "paymentMethods": methods
         }
@@ -334,6 +345,9 @@ class ChaosFactory(X9150DataFactory):
         return data
 
     def _missing_tip_range(self, data):
+        # Ensure we have a tip object to corrupt
+        if "tip" not in data["bill"]:
+            data["bill"]["tip"] = {}
         data["bill"]["tip"]["allowed"] = True
         data["bill"]["tip"].pop("range", None) # Range is mandatory if allowed is true
         return data

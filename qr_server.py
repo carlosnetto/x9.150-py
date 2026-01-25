@@ -31,7 +31,6 @@ app = Flask(__name__)
 
 # In-memory state (loaded from file)
 private_key_pem = None
-payer_public_key = None
 payee_thumbprint = None
 jwk_metadata = {}
 FAIL_SIGNATURE = False
@@ -65,7 +64,7 @@ def validate_against_spec(data, schema_name):
 
 def load_data():
     """Loads the generated ECC keys, certificates, and JWKS metadata."""
-    global private_key_pem, payee_cert_b64, payer_public_key, payee_thumbprint, jwk_metadata
+    global private_key_pem, payee_thumbprint, jwk_metadata
 
     # 1. Load the Private Key
     try:
@@ -75,34 +74,12 @@ def load_data():
         print("QR_SERVER: [!] Error: payee_key.txt not found. Run keygen.py first.")
         return False
 
-    # 2. Load the Certificate to calculate thumbprint (x5t#S256)
-    try:
-        with open("payee_db/certs/payee_cert.pem", "rb") as f:
-            cert_data = f.read()
-            cert = x509.load_pem_x509_certificate(cert_data)
-            
-            # Calculate SHA256 thumbprint (x5t#S256) directly from the certificate
-            cert_der = cert.public_bytes(serialization.Encoding.DER)
-            payee_thumbprint = base64.urlsafe_b64encode(hashlib.sha256(cert_der).digest()).rstrip(b'=').decode('ascii')
-    except Exception as e:
-        print(f"QR_SERVER: [!] Error loading payee_cert.pem: {e}")
-        return False
-
-    # 3. Load Payer's Public Key to verify incoming notifications
-    try:
-        with open("payer_db/certs/payer_cert.pem", "rb") as f:
-            cert_data = f.read()
-            cert = x509.load_pem_x509_certificate(cert_data)
-            payer_public_key = cert.public_key()
-    except FileNotFoundError:
-        print("QR_SERVER: [!] Warning: payer_cert.pem not found. Notification verification will fail.")
-        # We don't return False here to allow the server to start for fetching
-
-    # 4. Load the JWKS metadata for JWS headers
+    # 2. Load the JWKS metadata for JWS headers and thumbprint
     try:
         with open("payee_db/certs/payee.jwks", "r") as f:
             jwks = json.load(f)
             jwk_metadata = jwks["keys"][0]
+            payee_thumbprint = jwk_metadata.get("x5t#S256")
     except (FileNotFoundError, IndexError, KeyError):
         print("QR_SERVER: [!] Error: payee.jwks is missing or invalid.")
         return False

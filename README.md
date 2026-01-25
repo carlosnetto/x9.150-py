@@ -81,13 +81,19 @@ python qr_generator.py templates/01_coffee_shop.json
 ```
 
 ### 2. External Access (e.g., Mobile Scanning)
-If you want to scan the QR code with a real mobile device or external app, use a tunneling service (like `ssh -p 443 -R0:localhost:5000 a.pinggy.io`) and pass the domain to the script:
+If you want to scan the QR code or access the web-app with a real mobile device, use a tunneling service. 
 
+For the Payee Server (port 5005):
 ```bash
-python qr_server.py --domain <your-domain>.pinggy.io
+ssh -p 443 -R0:localhost:5005 free.pinggy.io
 ```
 
-This ensures the QR code contains the correct external URL.
+For the App Server / Web-App (port 5010), you can use the provided helper script:
+```bash
+./pinggy.sh
+```
+
+This provides an external IP/URL that you can open in your mobile browser to test the end-to-end flow.
 
 ### Testing Options
 
@@ -123,7 +129,15 @@ To understand the implementation, follow these files in order to see how the X9.
 
 ## App Server Proxy (`qr_appserver.py`)
 
-The `qr_appserver.py` listens on port **5010**. Its primary purpose is to act as a bridge for mobile apps or webapps that want to implement X9.150 without initially implementing the full JWS (JSON Web Signature) stack.
+The `qr_appserver.py` listens on port **5010**. Its primary purpose is to act as a bridge for mobile apps or webapps that want to implement X9.150 without initially implementing the full JWS (JSON Web Signature) stack. 
+
+### Web Application (`qr_app`)
+The project includes a simple web-app located in the `qr_app` folder that demonstrates how to interact with the App Server. 
+
+To launch the App Server and serve the web-app static files, use:
+```bash
+./qr_appserver.sh
+```
 
 ### ⚠️ Payment Responsibility Disclaimer
 The `qr_appserver.py` **does not handle wallets, mnemonics (12 words), or blockchain transactions.** 

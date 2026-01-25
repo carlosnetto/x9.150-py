@@ -612,8 +612,7 @@ def run_payer(fail_sig=False, fail_jws_custom=False, fail_iat=False, fail_ttl=Fa
                         "payment": {
                             "amount": test_amount,
                             "currency": "USDC",
-                            "network": "BASE",
-                            "paymentTiming": payload_json.get("bill", {}).get("paymentTiming")
+                            "network": "BASE"
                             # transactionId omitted for initiation
                         },
                         "payer": {

@@ -190,4 +190,6 @@ The security of X9.150 relies on **JSON Web Signatures (JWS)**. Every exchange f
 *   **Protected Header**: Tells the receiver which certificate to use (`jku`) and the algorithm (`ES256`). It also includes `x5t#S256` for efficient caching.
 *   **Payload**: The actual transaction data (Amount, Currency, Merchant ID).
 *   **Signature**: A cryptographic seal. If even one character in the payload is changed (e.g., changing $10.00 to $100.00), the signature verification will fail.
+
+**Note on Freshness**: To prevent replay attacks and ensure security, each JWS contains an `iat` (Issued At) and `ttl` (Time To Live) header. In this POC, the Payer app explicitly refreshes these headers immediately before signing each notification message. This ensures that the message is always "fresh" when it reaches the server, even if the user took several minutes to review and approve the payment details.
 ```

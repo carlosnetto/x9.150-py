@@ -623,6 +623,9 @@ def run_payer(fail_sig=False, fail_jws_custom=False, fail_iat=False, fail_ttl=Fa
                     }
                     validate_against_spec(notification_payload, "NotificationPayload")
 
+                    # Refresh iat and ttl for the initiation message
+                    headers["iat"] = int(time.time())
+                    headers["ttl"] = (headers["iat"] * 1000) + 60000
                     signed_init_notification = jws.sign(notification_payload, private_key_pem, headers=headers, algorithm='ES256')
                     
                     notify_url = payload_json.get("paymentNotification")
@@ -650,6 +653,9 @@ def run_payer(fail_sig=False, fail_jws_custom=False, fail_iat=False, fail_ttl=Fa
                                 notification_payload["payment"]["transactionId"] = tx_hash
                                 validate_against_spec(notification_payload, "NotificationPayload")
                                 
+                                # Refresh iat and ttl for the final message
+                                headers["iat"] = int(time.time())
+                                headers["ttl"] = (headers["iat"] * 1000) + 60000
                                 signed_final_notification = jws.sign(notification_payload, private_key_pem, headers=headers, algorithm='ES256')
                                 final_resp = requests.post(notify_url, data=signed_final_notification, headers={'Content-Type': 'application/jose'})
                                 if final_resp.status_code == 200:

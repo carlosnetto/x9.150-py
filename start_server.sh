@@ -6,7 +6,7 @@
 cleanup() {
     echo -e "
 [*] Shutting down servers..."
-    kill $CERTSERV_PID $APPSERVER_PID 2>/dev/null
+    kill $CERTSERV_PID $APPSERVER_PID $QR_SERVER_PID 2>/dev/null
     exit
 }
 
@@ -21,9 +21,13 @@ else
     exit 1
 fi
 
-echo "[*] Starting Certificate Server (port 8000)..."
+echo "[*] Starting Certificate Server (port 5001)..."
 python certserv.py &
 CERTSERV_PID=$!
+
+echo "[*] Starting Payee Server (port 5005)..."
+python qr_server.py &
+QR_SERVER_PID=$!
 
 echo "[*] Starting QR App Server (port 5010)..."
 python qr_appserver.py --root 'qr_app' &
@@ -34,4 +38,4 @@ sleep 2
 
 echo "[*] Opening Pinggy Tunnel (Reverse Proxy to 5010)..."
 echo "[*] Press Ctrl+C to stop all servers."
-ssh -p 443 -R0:localhost:5010 free.pinggy.io
+#ssh -p 443 -R0:localhost:5010 free.pinggy.io

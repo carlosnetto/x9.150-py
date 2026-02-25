@@ -2,6 +2,11 @@
 
 All notable changes to the X9.150 Secure Payment QR Code POC.
 
+## 2026-02-25
+- `8d81010` Replace qr_app references with external wallet repos in README
+- `d94aa1d` Add missing ultimateCreditor account to PayPal and CashApp templates
+- `4de4353` Add project docs (CLAUDE.md, HISTORY.md), refresh README, and reduce template amounts to under 2 USDC
+
 ## 2026-02-24
 - `54a02d3` Replace Base (EVM) USDC payment with Solana in qr_payer.py
 - `2922813` Remove qr_app frontend bundle from repository

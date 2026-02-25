@@ -16,8 +16,15 @@ from jose import jws
 from cryptography.hazmat.primitives import serialization
 from cryptography import x509
 from cryptography.hazmat.primitives.asymmetric import ec
-from web3 import Web3
-from eth_account import Account
+from solana.rpc.api import Client
+from solana.rpc.types import TxOpts
+from solders.transaction import Transaction
+from solders.message import Message
+from solders.keypair import Keypair
+from solders.pubkey import Pubkey
+from spl.token.instructions import transfer_checked, TransferCheckedParams, create_associated_token_account
+from spl.token.constants import TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID
+from bip_utils import Bip39SeedGenerator, Bip44, Bip44Coins, Bip44Changes
 import yaml
 from jsonschema import Draft7Validator
 import referencing
@@ -230,66 +237,99 @@ def display_payload(payload):
             detail_str = ", ".join([f"{dk}: {dv}" for dk, dv in details.items()])
             print(f"{net:15} | {detail_str}")
 
-def pay_usdc_on_base(mnemonic, recipient_address, amount_to_pay):
-    """Connects to Base and sends the specified amount of USDC."""
-    # This is a real blockchain transaction. It uses the Web3 library to 
-    # move USDC tokens on the Base (Layer 2) network.
-    # Base Mainnet RPC
-    w3 = Web3(Web3.HTTPProvider("https://mainnet.base.org"))
-    
-    if not w3.is_connected():
-        print("[!] Could not connect to Base network.")
-        return None, None
+def get_solana_keypair(mnemonic):
+    """Derives a Solana Keypair from a BIP39 mnemonic at m/44'/501'/0'/0' (Phantom-compatible)."""
+    seed = Bip39SeedGenerator(mnemonic).Generate()
+    bip44_ctx = Bip44.FromSeed(seed, Bip44Coins.SOLANA)
+    # m/44'/501'/0'/0' — 4-level derivation path (Phantom-compatible)
+    derived = bip44_ctx.Purpose().Coin().Account(0).Change(Bip44Changes.CHAIN_EXT)
+    return Keypair.from_seed(derived.PrivateKey().Raw().ToBytes()[:32])
 
-    # Enable mnemonic features
-    Account.enable_unaudited_hdwallet_features()
-    account = Account.from_mnemonic(mnemonic)
-    
-    # USDC Contract on Base
-    usdc_address = Web3.to_checksum_address("0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913")
-    usdc_abi = [
-        {
-            "constant": False,
-            "inputs": [{"name": "_to", "type": "address"}, {"name": "_value", "type": "uint256"}],
-            "name": "transfer",
-            "outputs": [{"name": "", "type": "bool"}],
-            "type": "function"
-        }
-    ]
-    
-    contract = w3.eth.contract(address=usdc_address, abi=usdc_abi)
-    
-    # amount_to_pay is expected in the token's smallest units (e.g., 6 decimals for USDC)
-    recipient = Web3.to_checksum_address(recipient_address)
-    nonce = w3.eth.get_transaction_count(account.address)
-    
-    print(f"[*] Preparing transaction from {account.address} to {recipient}")
+def pay_usdc_on_solana(mnemonic, recipient_address, amount_to_pay):
+    """Connects to Solana and sends the specified amount of USDC."""
+    # This is a real blockchain transaction. It uses the solana-py library to
+    # move USDC tokens on the Solana network.
+    USDC_MINT = Pubkey.from_string("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v")
+    USDC_DECIMALS = 6
+
+    client = Client("https://solana-rpc.publicnode.com")
+
+    keypair = get_solana_keypair(mnemonic)
+    sender = keypair.pubkey()
+    recipient = Pubkey.from_string(recipient_address)
+
+    # Derive Associated Token Accounts (ATAs)
+    sender_ata = Pubkey.find_program_address(
+        [bytes(sender), bytes(TOKEN_PROGRAM_ID), bytes(USDC_MINT)],
+        ASSOCIATED_TOKEN_PROGRAM_ID,
+    )[0]
+    recipient_ata = Pubkey.find_program_address(
+        [bytes(recipient), bytes(TOKEN_PROGRAM_ID), bytes(USDC_MINT)],
+        ASSOCIATED_TOKEN_PROGRAM_ID,
+    )[0]
+
+    # amount_to_pay is expected in the token's smallest units (6 decimals for USDC)
+    print(f"[*] Preparing transaction from {sender} to {recipient}")
     print(f"[*] Amount: {amount_to_pay / 1_000_000:.6f} USDC")
-    
+
     try:
-        txn = contract.functions.transfer(recipient, amount_to_pay).build_transaction({
-            'chainId': 8453,
-            'gas': 100000,
-            'gasPrice': w3.eth.gas_price,
-            'nonce': nonce,
-        })
-        
-        signed_txn = w3.eth.account.sign_transaction(txn, private_key=account.key)
-        tx_hash = w3.eth.send_raw_transaction(signed_txn.raw_transaction)
-        tx_hex = w3.to_hex(tx_hash)
+        # Get latest blockhash
+        blockhash_resp = client.get_latest_blockhash()
+        blockhash = blockhash_resp.value.blockhash
+        last_valid_height = blockhash_resp.value.last_valid_block_height
 
-        print(f"[*] USDC Payment Submitted! Hash: {tx_hex}")
-        print(f"[*] Waiting for confirmation on Base blockchain...")
+        instructions = []
 
-        receipt = w3.eth.wait_for_transaction_receipt(tx_hash)
-        if receipt['status'] == 1:
-            print(f"[OK] Transaction confirmed in block {receipt['blockNumber']}!")
-            print(f"[*] View on Explorer: https://basescan.org/tx/{tx_hex}")
-            return tx_hex, account.address
-        else:
-            print(f"[!] Transaction failed on-chain (Status: 0).")
-            print(f"[*] View on Explorer: https://basescan.org/tx/{tx_hex}")
+        # Check if recipient ATA exists; create if not (sender pays ~0.002 SOL rent)
+        acct_resp = client.get_account_info(recipient_ata)
+        if acct_resp.value is None:
+            print("[*] Creating recipient token account (sender pays ~0.002 SOL rent)...")
+            instructions.append(create_associated_token_account(sender, recipient, USDC_MINT))
+
+        # SPL transfer_checked (validates mint + decimals for safety)
+        instructions.append(transfer_checked(TransferCheckedParams(
+            program_id=TOKEN_PROGRAM_ID,
+            source=sender_ata,
+            mint=USDC_MINT,
+            dest=recipient_ata,
+            owner=sender,
+            amount=amount_to_pay,
+            decimals=USDC_DECIMALS,
+        )))
+
+        # Build, sign, simulate, send
+        msg = Message.new_with_blockhash(instructions, sender, blockhash)
+        tx = Transaction.new_unsigned(msg)
+        tx.sign([keypair], blockhash)
+
+        # Simulate before sending (free, catches errors early)
+        sim = client.simulate_transaction(tx)
+        if sim.value.err:
+            print(f"[!] Transaction simulation failed: {sim.value.err}")
+            if sim.value.logs:
+                for log in sim.value.logs:
+                    print(f"    {log}")
             return None, None
+
+        # Send (skip preflight since we already simulated)
+        send_resp = client.send_raw_transaction(
+            bytes(tx), opts=TxOpts(skip_preflight=True)
+        )
+        signature = str(send_resp.value)
+
+        print(f"[*] USDC Payment Submitted! Signature: {signature}")
+        print(f"[*] Waiting for confirmation on Solana blockchain...")
+
+        # Confirm
+        client.confirm_transaction(
+            tx_sig=send_resp.value,
+            commitment="confirmed",
+            last_valid_block_height=last_valid_height,
+        )
+
+        print(f"[OK] Transaction confirmed!")
+        print(f"[*] View on Explorer: https://solscan.io/tx/{signature}")
+        return signature, str(sender)
 
     except Exception as e:
         print(f"[!] Blockchain transaction failed: {e}")
@@ -576,30 +616,29 @@ def run_payer(fail_sig=False, fail_jws_custom=False, fail_iat=False, fail_ttl=Fa
                 return
             
             # --- Blockchain Payment Step ---
-            usdc_base_address = None
+            usdc_solana_address = None
             usdc_amount = 0
             for pm in payload_json.get("paymentMethods", []):
                 if pm.get("currency") == "USDC":
                     networks = pm.get("networks", {})
-                    if "Base" in networks:
-                        usdc_base_address = networks["Base"].get("address")
+                    if "Solana" in networks:
+                        usdc_solana_address = networks["Solana"].get("address")
                         usdc_amount = pm.get("amount", 0)
                         break
-            
-            if usdc_base_address:
+
+            if usdc_solana_address:
                 wallet_file = "wallet_keys.txt"
                 if os.path.exists(wallet_file):
                     with open(wallet_file, "r") as f:
                         mnemonic = " ".join([line.strip() for line in f if line.strip()])
                     
-                    print(f"\n[*] USDC (Base) payment method detected.")
+                    print(f"\n[*] USDC (Solana) payment method detected.")
 
                     test_amount = int(usdc_amount)
 
                     # Derive address for notification
-                    Account.enable_unaudited_hdwallet_features()
-                    account = Account.from_mnemonic(mnemonic)
-                    payer_addr = account.address
+                    keypair = get_solana_keypair(mnemonic)
+                    payer_addr = str(keypair.pubkey())
 
                     # --- Step 1: Initial Payment Notification (Initiation) ---
                     # We tell the Merchant we are starting the payment so they can 
@@ -610,7 +649,7 @@ def run_payer(fail_sig=False, fail_jws_custom=False, fail_iat=False, fail_ttl=Fa
                         "payment": {
                             "amount": test_amount,
                             "currency": "USDC",
-                            "network": "BASE"
+                            "network": "Solana"
                             # transactionId omitted for initiation
                         },
                         "payer": {
@@ -641,7 +680,7 @@ def run_payer(fail_sig=False, fail_jws_custom=False, fail_iat=False, fail_ttl=Fa
                             print("[*] Payee will accept the payment and the qr code is locked to avoid duplicated payment.")
                             
                             # --- Blockchain Payment Step ---
-                            tx_hash, _ = pay_usdc_on_base(mnemonic, usdc_base_address, test_amount)
+                            tx_hash, _ = pay_usdc_on_solana(mnemonic, usdc_solana_address, test_amount)
                             # Once the blockchain transaction is submitted, we have a 
                             # transaction hash (tx_hash) as proof.
 
@@ -672,7 +711,7 @@ def run_payer(fail_sig=False, fail_jws_custom=False, fail_iat=False, fail_ttl=Fa
                 else:
                     print(f"\n[!] USDC method available but '{wallet_file}' not found.")
                     print(f"    Create a file named '{wallet_file}' containing the 12 mnemonic words")
-                    print(f"    of a testing wallet with USDC and ETH balances on the Base blockchain.")
+                    print(f"    of a testing wallet with USDC and SOL balances on the Solana blockchain.")
         else:
             print(f"[!] Error from server:")
             log_server_error(response)

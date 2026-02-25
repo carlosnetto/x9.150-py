@@ -7,7 +7,8 @@ qrcode[pil]
 python-jose
 cryptography
 requests
-web3
+solana
+bip-utils
 jsonschema
 flask-cors
 openapi-schema-validator>=0.6.0

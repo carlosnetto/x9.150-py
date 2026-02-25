@@ -43,7 +43,7 @@ This proves that QR code payments can be open, interoperable, and secure, and th
 *   **Explicit Routing**: Uses dedicated paths for payload retrieval (`/fetch/`) and notifications (`/notify/`) instead of a single broker endpoint.
 *   **Tunneling Support**: Easily integrates with tunneling services like `pinggy.io` for external device testing.
 *   **Certificate Server**: Includes a dedicated service to host public keys and JWKS metadata.
-*   **Blockchain Integration**: Payer simulation supports USDC payments on the Base network.
+*   **Blockchain Integration**: Payer simulation supports USDC payments on the Solana network.
 
 ## Prerequisites
 
@@ -176,10 +176,10 @@ Used by a payer-side app to inform the merchant that a payment has been initiate
         "payment": {
             "amount": 1000,
             "currency": "USDC",
-            "network": "Base",
-            "transactionId": "0x..." 
+            "network": "Solana",
+            "transactionId": "5UfDuX..."
         },
-        "payer": { "info": "user@email.com", "fromAddress": "0x..." },
+        "payer": { "info": "user@email.com", "fromAddress": "7xKX..." },
         "expectedDate": "2025-09-30T18:04:00Z"
     }
     ```

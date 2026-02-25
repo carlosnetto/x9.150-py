@@ -87,8 +87,8 @@
             "currency": "USDC",
             "amount": 9990000,
             "networks": {
-                "Base": {
-                    "address": "0xa6d0AeFeB0427E0011003BFD8486f7b12b8C2ceb"
+                "Solana": {
+                    "address": "emjE6JshbysqU93MiTVFpjUQSo6GHjEhUNCLrSBjuiC"
                 }
             }
         },

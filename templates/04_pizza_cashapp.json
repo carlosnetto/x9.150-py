@@ -11,6 +11,10 @@
             "country": "US"
         },
         "ultimateCreditor": {
+            "account": {
+                "id": "$TonysPizza",
+                "schemaName": "cashtag"
+            },
             "name": "Tony's Pizza",
             "address": {
                 "line1": "321 Deep Dish Ln",

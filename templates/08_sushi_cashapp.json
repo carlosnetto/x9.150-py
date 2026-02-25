@@ -11,6 +11,10 @@
             "country": "US"
         },
         "ultimateCreditor": {
+            "account": {
+                "id": "$SakuraSushi",
+                "schemaName": "cashtag"
+            },
             "name": "Sakura Sushi",
             "address": {
                 "line1": "555 Zen Garden",

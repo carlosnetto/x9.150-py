@@ -11,6 +11,10 @@
             "country": "US"
         },
         "ultimateCreditor": {
+            "account": {
+                "id": "support@gadgethub.com",
+                "schemaName": "email"
+            },
             "name": "Gadget Hub",
             "address": {
                 "line1": "789 Tech Plaza",

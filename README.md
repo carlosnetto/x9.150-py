@@ -147,8 +147,10 @@ To understand the implementation, follow these files in order to see how the X9.
 
 The `qr_appserver.py` listens on port **5010**. Its primary purpose is to act as a bridge for mobile apps or webapps that want to implement X9.150 without initially implementing the full JWS (JSON Web Signature) stack. 
 
-### Web Application (`qr_app`)
-The project includes a simple web-app located in the `qr_app` folder that demonstrates how to interact with the App Server. 
+### Compatible Wallets
+The following wallet apps are designed to work with the App Server. Their source code is maintained independently:
+*   **[ybank.me-wallet-solana](https://github.com/carlosnetto/ybank.me-wallet-solana)** — Solana-based wallet
+*   **[ybank.me-wallet](https://github.com/carlosnetto/ybank.me-wallet)** — Base (EVM) wallet
 
 To launch the App Server (along with all other servers), use:
 ```bash
@@ -156,9 +158,9 @@ To launch the App Server (along with all other servers), use:
 ```
 
 ### ⚠️ Payment Responsibility Disclaimer
-The `qr_appserver.py` **does not handle wallets, mnemonics (12 words), or blockchain transactions.** 
-*   The mobile app is responsible for managing the user's private keys.
-*   The mobile app is responsible for executing the actual payment on the blockchain (e.g., Solana) using the details provided in the `PaymentRequest`.
+The `qr_appserver.py` **does not handle wallets, mnemonics (12 words), or blockchain transactions.**
+*   The wallet app is responsible for managing the user's private keys.
+*   The wallet app is responsible for executing the actual payment on the blockchain (e.g., Solana) using the details provided in the `PaymentRequest`.
 *   The app server simply facilitates the secure communication protocol defined by X9.150.
 
 ### Exposed APIs

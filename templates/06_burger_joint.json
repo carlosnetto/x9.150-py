@@ -20,7 +20,7 @@
             "date": "2026-01-16"
         },
         "amountDue": {
-            "amount": 1875,
+            "amount": 47,
             "currency": "USD"
         },
         "tip": {
@@ -40,21 +40,21 @@
     "additionalInformation": [
         {
             "key": "Double Cheeseburger",
-            "value": "12.00"
+            "value": "0.25"
         },
         {
             "key": "Fries",
-            "value": "4.25"
+            "value": "0.12"
         },
         {
             "key": "Coke",
-            "value": "2.50"
+            "value": "0.10"
         }
     ],
     "paymentMethods": [
         {
             "currency": "USD",
-            "amount": 1875,
+            "amount": 47,
             "networks": {
                 "FedNow": {
                     "routingNumber": "123456789",
@@ -70,7 +70,7 @@
         },
         {
             "currency": "USDC",
-            "amount": 18750000,
+            "amount": 470000,
             "networks": {
                 "Solana": {
                     "address": "emjE6JshbysqU93MiTVFpjUQSo6GHjEhUNCLrSBjuiC"

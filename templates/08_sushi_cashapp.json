@@ -30,7 +30,7 @@
             "date": "2026-01-16"
         },
         "amountDue": {
-            "amount": 6800,
+            "amount": 72,
             "currency": "USD"
         },
         "tip": {
@@ -50,21 +50,21 @@
     "additionalInformation": [
         {
             "key": "Salmon Nigiri",
-            "value": "45.00"
+            "value": "0.40"
         },
         {
             "key": "Miso Soup",
-            "value": "15.00"
+            "value": "0.20"
         },
         {
             "key": "Green Tea",
-            "value": "8.00"
+            "value": "0.12"
         }
     ],
     "paymentMethods": [
         {
             "currency": "USD",
-            "amount": 6800,
+            "amount": 72,
             "networks": {
                 "FedNow": {
                     "routingNumber": "123456789",
@@ -80,7 +80,7 @@
         },
         {
             "currency": "USDC",
-            "amount": 68000000,
+            "amount": 720000,
             "networks": {
                 "Solana": {
                     "address": "emjE6JshbysqU93MiTVFpjUQSo6GHjEhUNCLrSBjuiC"

@@ -41,7 +41,7 @@ This proves that QR code payments can be open, interoperable, and secure, and th
     *   Signs outgoing payloads and notifications using `ES256`.
     *   Supports **JWKS-based Verification**: Uses `jku` (JWK Set URL) for certificate discovery and `x5t#S256` (Thumbprint) for efficient local caching and pinning.
 *   **Explicit Routing**: Uses dedicated paths for payload retrieval (`/fetch/`) and notifications (`/notify/`) instead of a single broker endpoint.
-*   **Tunneling Support**: Easily integrates with tunneling services like `pinggy.io` for external device testing.
+*   **Tunneling Support**: Easily integrates with tunneling services like `pinggy.io` or `cloudflared` for external device testing.
 *   **Certificate Server**: Includes a dedicated service to host public keys and JWKS metadata.
 *   **Blockchain Integration**: Payer simulation supports USDC payments on the Solana network.
 
@@ -80,22 +80,36 @@ Run the generator script with a biller template to create the payment payload, r
 python qr_generator.py templates/01_coffee_shop.json
 ```
 
-### 2. External Access (e.g., Mobile Scanning)
-If you want to scan the QR code or access the web-app with a real mobile device, use a tunneling service. 
+### 4. Solana Wallet Setup (for Payer Simulation)
+To run `qr_payer.py` with real blockchain payments, create a `wallet_keys.txt` file containing your 12-word BIP39 mnemonic, **one word per line**:
+```
+word1
+word2
+...
+word12
+```
+The wallet needs:
+*   **USDC** (SPL token) — to fund the payment amount.
+*   **SOL** — a small balance for transaction fees.
 
-For the Payee Server (port 5005):
+The payer derives keys using BIP44 path `m/44'/501'/0'/0'`.
+
+### 5. External Access (e.g., Mobile Scanning)
+If you want to scan the QR code or access the web-app with a real mobile device, use a tunneling service.
+
+**Using pinggy** (Payee Server on port 5005):
 ```bash
 ssh -p 443 -R0:localhost:5005 free.pinggy.io
 ```
 
-For the App Server / Web-App (port 5010), you can use the provided helper script:
+**Using cloudflared** (see `cloudflared-config.yml` for multi-port setup):
 ```bash
-./pinggy.sh
+cloudflared tunnel run
 ```
 
 This provides an external IP/URL that you can open in your mobile browser to test the end-to-end flow.
 
-### Testing Options
+### 6. Testing Options
 
 The Payee Server (`qr_server.py`) and Payer Simulator (`qr_payer.py`) support specific flags for testing error handling:
 
@@ -106,7 +120,7 @@ The Payee Server (`qr_server.py`) and Payer Simulator (`qr_payer.py`) support sp
 *   `--failjwscustom`: (Payer only) Randomly omits one or more mandatory JWS headers (`iat`, `ttl`, `correlationId`) to test server-side validation of critical headers.
 *   `--sanctionedWallet`: (Server only) Specifies a blockchain address to block. If a payment notification is received from this address, the server returns a 403 error, simulating a sanctions hit.
 
-### Specification Documentation
+### 7. Specification Documentation
 
 To facilitate the mapping between the technical OpenAPI specification and the X9.150 documentation, use the `dump_open_api.py` utility:
 
@@ -126,6 +140,8 @@ To understand the implementation, follow these files in order to see how the X9.
 4.  **`qr_server.py` (The Payee Backend)**: The core logic. It loads keys from `payee_db/certs` and payloads from `payee_db/qrs`. It manages the `/fetch/` endpoint and the `/notify/` endpoint.
 5.  **`qr_payer.py` (The Wallet Simulator)**: Simulates the consumer's banking app. It scans QR codes from `payer_db/qrs` and loads its own identity from `payer_db/certs`. It performs the critical "Verification" step: checking the Merchant's JWS signature and validating the certificate before showing the "Pay" button to the user.
 6.  **`qr_appserver.py` (The App Developer Proxy)**: A gateway designed to simplify integration for mobile and web applications. It handles all JWS signing and verification internally, allowing the frontend to communicate using plain JSON.
+7.  **`qr_parser.py` (The QR Validator)**: Parses and validates EMVCo QR content strings, printing the TLV (Tag-Length-Value) structure for debugging and spec compliance checks.
+8.  **`test_data.py` (The Test Data Generator)**: Generates randomized payment request templates for bulk testing against the OpenAPI schema.
 
 ## App Server Proxy (`qr_appserver.py`)
 
@@ -134,15 +150,15 @@ The `qr_appserver.py` listens on port **5010**. Its primary purpose is to act as
 ### Web Application (`qr_app`)
 The project includes a simple web-app located in the `qr_app` folder that demonstrates how to interact with the App Server. 
 
-To launch the App Server and serve the web-app static files, use:
+To launch the App Server (along with all other servers), use:
 ```bash
-./qr_appserver.sh
+./start_server.sh
 ```
 
 ### ⚠️ Payment Responsibility Disclaimer
 The `qr_appserver.py` **does not handle wallets, mnemonics (12 words), or blockchain transactions.** 
 *   The mobile app is responsible for managing the user's private keys.
-*   The mobile app is responsible for executing the actual payment on the blockchain (Solana, Ethereum, Base, etc.) using the details provided in the `PaymentRequest`.
+*   The mobile app is responsible for executing the actual payment on the blockchain (e.g., Solana) using the details provided in the `PaymentRequest`.
 *   The app server simply facilitates the secure communication protocol defined by X9.150.
 
 ### Exposed APIs
@@ -192,4 +208,3 @@ The security of X9.150 relies on **JSON Web Signatures (JWS)**. Every exchange f
 *   **Signature**: A cryptographic seal. If even one character in the payload is changed (e.g., changing $10.00 to $100.00), the signature verification will fail.
 
 **Note on Freshness**: To prevent replay attacks and ensure security, each JWS contains an `iat` (Issued At) and `ttl` (Time To Live) header. In this POC, the Payer app explicitly refreshes these headers immediately before signing each notification message. This ensures that the message is always "fresh" when it reaches the server, even if the user took several minutes to review and approve the payment details.
-```

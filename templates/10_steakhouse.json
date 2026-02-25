@@ -20,7 +20,7 @@
             "date": "2026-01-16"
         },
         "amountDue": {
-            "amount": 21000,
+            "amount": 155,
             "currency": "USD"
         },
         "tip": {
@@ -39,21 +39,21 @@
     "additionalInformation": [
         {
             "key": "Ribeye Steak",
-            "value": "140.00"
+            "value": "0.85"
         },
         {
             "key": "Mashed Potatoes",
-            "value": "30.00"
+            "value": "0.35"
         },
         {
             "key": "Red Wine",
-            "value": "40.00"
+            "value": "0.35"
         }
     ],
     "paymentMethods": [
         {
             "currency": "USD",
-            "amount": 21000,
+            "amount": 155,
             "networks": {
                 "FedNow": {
                     "routingNumber": "123456789",
@@ -69,7 +69,7 @@
         },
         {
             "currency": "USDC",
-            "amount": 210000000,
+            "amount": 1550000,
             "networks": {
                 "Solana": {
                     "address": "emjE6JshbysqU93MiTVFpjUQSo6GHjEhUNCLrSBjuiC"

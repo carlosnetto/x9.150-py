@@ -30,7 +30,7 @@
             "date": "2026-01-16"
         },
         "amountDue": {
-            "amount": 2450,
+            "amount": 89,
             "currency": "USD"
         },
         "tip": {
@@ -50,21 +50,21 @@
     "additionalInformation": [
         {
             "key": "Pepperoni Pizza",
-            "value": "18.00"
+            "value": "0.50"
         },
         {
             "key": "Garlic Knots",
-            "value": "4.00"
+            "value": "0.24"
         },
         {
             "key": "Diet Coke",
-            "value": "2.50"
+            "value": "0.15"
         }
     ],
     "paymentMethods": [
         {
             "currency": "USD",
-            "amount": 2450,
+            "amount": 89,
             "networks": {
                 "FedNow": {
                     "routingNumber": "123456789",
@@ -80,7 +80,7 @@
         },
         {
             "currency": "USDC",
-            "amount": 24500000,
+            "amount": 890000,
             "networks": {
                 "Solana": {
                     "address": "emjE6JshbysqU93MiTVFpjUQSo6GHjEhUNCLrSBjuiC"

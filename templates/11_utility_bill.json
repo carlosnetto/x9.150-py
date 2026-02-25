@@ -32,12 +32,12 @@
             }
         },
         "amountDue": {
-            "amount": 7500,
+            "amount": 33,
             "currency": "USD",
             "adjustments": [
                 {
                     "explanation": "10% fee for late payment",
-                    "amount": 750
+                    "amount": 3
                 }
             ]
         },
@@ -58,7 +58,7 @@
     "paymentMethods": [
         {
             "currency": "USD",
-            "amount": 15500,
+            "amount": 36,
             "networks": {
                 "FedNow": {
                     "routingNumber": "123456789",
@@ -79,7 +79,7 @@
         },
         {
             "currency": "USDC",
-            "amount": 155000000,
+            "amount": 360000,
             "networks": {
                 "Solana": {
                     "address": "emjE6JshbysqU93MiTVFpjUQSo6GHjEhUNCLrSBjuiC"

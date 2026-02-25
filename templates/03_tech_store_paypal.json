@@ -30,14 +30,14 @@
             "date": "2026-01-16"
         },
         "amountDue": {
-            "amount": 45000,
+            "amount": 13,
             "currency": "USD"
         }
     },
     "paymentMethods": [
         {
             "currency": "USD",
-            "amount": 45000,
+            "amount": 13,
             "networks": {
                 "FedNow": {
                     "routingNumber": "123456789",
@@ -53,7 +53,7 @@
         },
         {
             "currency": "USDC",
-            "amount": 450000000,
+            "amount": 130000,
             "networks": {
                 "Solana": {
                     "address": "emjE6JshbysqU93MiTVFpjUQSo6GHjEhUNCLrSBjuiC"

@@ -20,7 +20,7 @@
             "date": "2026-02-16"
         },
         "amountDue": {
-            "amount": 1500,
+            "amount": 142,
             "currency": "USD"
         },
         "tip": {
@@ -39,21 +39,21 @@
     "additionalInformation": [
         {
             "key": "Test #1",
-            "value": "5.00"
+            "value": "0.50"
         },
         {
             "key": "Test #2",
-            "value": "5.00"
+            "value": "0.50"
         },
         {
             "key": "Test #3",
-            "value": "5.00"
+            "value": "0.42"
         }
     ],
     "paymentMethods": [
         {
             "currency": "USD",
-            "amount": 1500,
+            "amount": 142,
             "networks": {
                 "FedNow": {
                     "routingNumber": "123456789",
@@ -69,7 +69,7 @@
         },
         {
             "currency": "USDC",
-            "amount": 1500000,
+            "amount": 1420000,
             "networks": {
                 "Solana": {
                     "address": "emjE6JshbysqU93MiTVFpjUQSo6GHjEhUNCLrSBjuiC"
@@ -78,7 +78,7 @@
         },
         {
             "currency": "BRL",
-            "amount": 7500,
+            "amount": 710,
             "networks": {
                 "Pix": {
                     "key": "carlos.netto@gmail.com"

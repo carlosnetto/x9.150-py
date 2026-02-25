@@ -20,7 +20,7 @@
             "date": "2026-01-16"
         },
         "amountDue": {
-            "amount": 6500,
+            "amount": 175,
             "currency": "USD"
         },
         "tip": {
@@ -40,21 +40,21 @@
     "additionalInformation": [
         {
             "key": "Wagyu Steak",
-            "value": "55.00"
+            "value": "0.95"
         },
         {
             "key": "Vintage Bordeaux",
-            "value": "5.00"
+            "value": "0.45"
         },
         {
             "key": "Truffle Risotto",
-            "value": "5.00"
+            "value": "0.35"
         }
     ],
     "paymentMethods": [
         {
             "currency": "USD",
-            "amount": 6500,
+            "amount": 175,
             "networks": {
                 "FedNow": {
                     "routingNumber": "123456789",
@@ -70,7 +70,7 @@
         },
         {
             "currency": "USDC",
-            "amount": 65000000,
+            "amount": 1750000,
             "networks": {
                 "Solana": {
                     "address": "emjE6JshbysqU93MiTVFpjUQSo6GHjEhUNCLrSBjuiC"
@@ -79,7 +79,7 @@
         },
         {
             "currency": "BRL",
-            "amount": 32500,
+            "amount": 875,
             "networks": {
                 "Pix": {
                     "key": "carlos.netto@gmail.com"

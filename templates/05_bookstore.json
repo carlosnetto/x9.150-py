@@ -20,14 +20,14 @@
             "date": "2026-01-16"
         },
         "amountDue": {
-            "amount": 3200,
+            "amount": 123,
             "currency": "USD"
         }
     },
     "paymentMethods": [
         {
             "currency": "USD",
-            "amount": 3200,
+            "amount": 123,
             "networks": {
                 "FedNow": {
                     "routingNumber": "123456789",

@@ -57,6 +57,16 @@ qr_server  ⟵ notify ⟵ qr_payer (or qr_appserver)
 - RPC endpoint: `https://api.mainnet-beta.solana.com` (publicnode.com)
 - Wallet: 12-word mnemonic stored in `wallet_keys.txt` (one word per line)
 
+## Python Version
+
+**Use Python 3.13** (latest stable). Python 3.14+ is not supported — `coincurve` (a dependency of `bip-utils`) fails to build on 3.14 due to a missing LICENSE file in the cffi distribution during wheel building.
+
+```bash
+python3.13 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
 ## How to Run
 
 ```bash

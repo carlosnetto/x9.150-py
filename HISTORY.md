@@ -3,6 +3,7 @@
 All notable changes to the X9.150 Secure Payment QR Code POC.
 
 ## 2026-02-25
+- Document Python 3.13 requirement — `coincurve` fails to build on Python 3.14+
 - `9fb5293` Update HISTORY.md with latest commits
 - `8d81010` Replace qr_app references with external wallet repos in README
 - `d94aa1d` Add missing ultimateCreditor account to PayPal and CashApp templates

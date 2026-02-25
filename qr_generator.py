@@ -89,6 +89,7 @@ def format_emv_qr(url, template):
     clean_url = url.split("://")[-1] if "://" in url else url
     tag_26_val = tlv("00", "org.x9") + tlv("01", clean_url)
     
+    # Amount in the JSON payload is in cents; convert to decimal for the EMVCo QR string.
     amt_decimal = f"{amt_due.get('amount', 0) / 100:.2f}"
     currency_num = CURRENCY_TO_NUMERIC.get(amt_due.get("currency"), "840")
     

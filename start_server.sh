@@ -17,7 +17,7 @@ echo "[*] Activating virtual environment..."
 if [ -d "venv" ]; then
     source venv/bin/activate
 else
-    echo "[!] Error: venv directory not found."
+    echo "[!] Error: venv directory not found. Create it with: python3 -m venv venv && source venv/bin/activate && pip install -r requirements.txt"
     exit 1
 fi
 
@@ -28,14 +28,3 @@ CERTSERV_PID=$!
 echo "[*] Starting Payee Server (port 5005)..."
 python qr_server.py &
 QR_SERVER_PID=$!
-
-echo "[*] Starting QR App Server (port 5010)..."
-python qr_appserver.py --root 'qr_app' &
-APPSERVER_PID=$!
-
-# Wait a moment for servers to initialize
-sleep 2
-
-echo "[*] Opening Pinggy Tunnel (Reverse Proxy to 5010)..."
-echo "[*] Press Ctrl+C to stop all servers."
-#ssh -p 443 -R0:localhost:5010 free.pinggy.io

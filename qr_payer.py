@@ -594,9 +594,7 @@ def run_payer(fail_sig=False, fail_jws_custom=False, fail_iat=False, fail_ttl=Fa
                     
                     print(f"\n[*] USDC (Base) payment method detected.")
 
-                    # Dividing the requested amount by 100 for testing purposes 
-                    # to reduce actual cost while validating the flow.
-                    test_amount = int(usdc_amount / 100)
+                    test_amount = int(usdc_amount)
 
                     # Derive address for notification
                     Account.enable_unaudited_hdwallet_features()
@@ -672,7 +670,9 @@ def run_payer(fail_sig=False, fail_jws_custom=False, fail_iat=False, fail_ttl=Fa
                         print(f"[!] Payee initiation failed (Status {init_resp.status_code}):")
                         log_server_error(init_resp)
                 else:
-                    print(f"\n[!] USDC method available but {wallet_file} not found.")
+                    print(f"\n[!] USDC method available but '{wallet_file}' not found.")
+                    print(f"    Create a file named '{wallet_file}' containing the 12 mnemonic words")
+                    print(f"    of a testing wallet with USDC and ETH balances on the Base blockchain.")
         else:
             print(f"[!] Error from server:")
             log_server_error(response)

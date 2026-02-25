@@ -90,6 +90,12 @@ python qr_payer.py
 | `--failCorrelationId` | Server | Returns mismatched `correlationId` to test non-repudiation |
 | `--sanctionedWallet` | Server | Blocks a specified blockchain address (403 on match) |
 
+## Compatible Wallets
+
+The `qr_appserver.py` proxy is designed to work with external wallet apps (maintained independently):
+- **[ybank.me-wallet-solana](https://github.com/carlosnetto/ybank.me-wallet-solana)** — Solana-based wallet
+- **[ybank.me-wallet](https://github.com/carlosnetto/ybank.me-wallet)** — Base (EVM) wallet
+
 ## Coding Style
 
 - Standard 3-line header comment on every `.py` file (author, purpose, not-for-production)

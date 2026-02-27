@@ -145,6 +145,8 @@ To understand the implementation, follow these files in order to see how the X9.
 6.  **`qr_appserver.py` (The App Developer Proxy)**: A gateway designed to simplify integration for mobile and web applications. It handles all JWS signing and verification internally, allowing the frontend to communicate using plain JSON.
 7.  **`qr_parser.py` (The QR Validator)**: Parses and validates EMVCo QR content strings, printing the TLV (Tag-Length-Value) structure for debugging and spec compliance checks.
 8.  **`test_data.py` (The Test Data Generator)**: Generates randomized payment request templates for bulk testing against the OpenAPI schema.
+9.  **`opencert.py` (The Certificate Inspector)**: Reads a JWKS file and displays the full `x5c` certificate chain — subject, issuer, extensions, fingerprints, and chain linkage verification. Useful for inspecting X9 Financial PKI certificates.
+10. **`validatepair.py` (The Key Pair Validator)**: Validates that a private key file (`*_key.pem`) matches its JWKS certificate by signing and verifying a test payload, and checking the `x5t#S256` thumbprint. Supports both RSA and ECC key types.
 
 ## App Server Proxy (`qr_appserver.py`)
 

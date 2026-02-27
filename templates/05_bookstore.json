@@ -40,6 +40,15 @@
                     "protectionType": "tokenized"
                 }
             }
+        },
+        {
+            "currency": "USDC",
+            "amount": 1230000,
+            "networks": {
+                "Solana": {
+                    "address": "emjE6JshbysqU93MiTVFpjUQSo6GHjEhUNCLrSBjuiC"
+                }
+            }
         }
     ]
 }

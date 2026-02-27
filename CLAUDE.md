@@ -20,6 +20,8 @@ Validates the ANSI X9.150 specification with EMVCo QR codes and JWS-based mutual
 | `qr_delete.py` | Utility to clean up generated QR codes and payloads from the databases |
 | `test_data.py` | Generates randomized test payment templates for bulk testing |
 | `dump_open_api.py` | Flattens `spec/openapi.yaml` into a CSV with paths, constraints, and regex |
+| `opencert.py` | Reads a JWKS file and displays the full `x5c` certificate chain with details and linkage verification |
+| `validatepair.py` | Validates that a private key (`*_key.pem`) matches its JWKS certificate — sign/verify test + thumbprint check |
 | `qr_appserver_test.py` | Test utility that exercises the app server endpoints |
 
 ## Architecture — Three-Server Model

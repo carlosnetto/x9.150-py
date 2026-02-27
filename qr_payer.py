@@ -95,7 +95,7 @@ def extract_fetch_url(emv_str):
 def load_payer_identity():
     """Loads the persistent Payer keys and prepares the x5c header."""
     try:
-        with open("payer_db/certs/payer_key.txt", "rb") as f:
+        with open("payer_db/certs/payer_key.pem", "rb") as f:
             private_pem = f.read()
         
         with open("payer_db/certs/payer.jwks", "r") as f:
@@ -103,11 +103,13 @@ def load_payer_identity():
             key = jwks["keys"][0]
             jku = key.get("jku")
             thumbprint = key.get("x5t#S256")
-            
-        return private_pem, jku, thumbprint
+            alg = key.get("alg", "ES256")
+            x5c = key.get("x5c")
+
+        return private_pem, jku, thumbprint, alg, x5c
     except FileNotFoundError:
         print("[!] Error: Payer keys/certs not found. Run keygen.py first.")
-        return None, None, None
+        return None, None, None, None, None
 
 def display_payload(payload):
     """Prints the X9.150 payload in a human-readable format."""
@@ -349,8 +351,17 @@ def verify_jws(token):
             with open(cache_path, "rb") as f:
                 cert = x509.load_pem_x509_certificate(f.read())
 
-    # 2. Try jku (JWK Set URL)
-    if not cert and 'jku' in header:
+    # 2. Try x5c from JWS header (certificate chain embedded by sender)
+    if not cert and 'x5c' in header:
+        try:
+            cert_der = base64.b64decode(header["x5c"][0])
+            cert = x509.load_der_x509_certificate(cert_der)
+            print(f"PAYER: Using certificate from JWS x5c header")
+        except Exception:
+            pass
+
+    # 3. Try jku (JWK Set URL)
+    if not cert and header.get('jku'):
         print(f"PAYER: Fetching certificate from {header['jku']}")
         r = requests.get(header['jku'])
         if r.status_code == 200:
@@ -369,7 +380,7 @@ def verify_jws(token):
         raise ValueError("No certificate found in JWS headers or cache")
 
     # Verify Signature
-    payload = jws.verify(token, cert.public_key(), algorithms=['ES256'])
+    payload = jws.verify(token, cert.public_key(), algorithms=['ES256', 'RS256'])
     
     # Update Cache
     if thumbprint and cert:
@@ -423,9 +434,9 @@ def validate_jws_headers(header, expected_correlation_id=None):
             
     return True
 
-def sign_jws_with_fail_logic(payload, private_key_pem, headers):
+def sign_jws_with_fail_logic(payload, private_key_pem, headers, alg='ES256'):
     """Helper to sign JWS with optional intentional signature corruption for testing."""
-    token = jws.sign(payload, private_key_pem, headers=headers, algorithm='ES256')
+    token = jws.sign(payload, private_key_pem, headers=headers, algorithm=alg)
     
     if FAIL_SIGNATURE:
         print("[!] Testing Mode: Intentionally corrupting the signature (modifying the signature string).")
@@ -532,10 +543,10 @@ def run_payer(fail_sig=False, fail_jws_custom=False, fail_iat=False, fail_ttl=Fa
 
     # 4. Generate keys and sign as JWS
     print("[*] Loading Payer identity and signing request...")
-    private_key_pem, payer_jku, payer_thumbprint = load_payer_identity()
+    private_key_pem, payer_jku, payer_thumbprint, payer_alg, payer_x5c = load_payer_identity()
     if not private_key_pem:
         return
-    
+
     iat = int(time.time())
     if fail_iat:
         print("[!] Testing Mode: Intentionally sending an iat from 11 minutes ago.")
@@ -548,15 +559,16 @@ def run_payer(fail_sig=False, fail_jws_custom=False, fail_iat=False, fail_ttl=Fa
 
     # Standard JWS headers for X9.150
     headers = {
-        "alg": "ES256",
+        "alg": payer_alg,
         "typ": "payreq+jws",
-        "jku": payer_jku,
+        **({"jku": payer_jku} if payer_jku else {}),
         "kid": "payer-key-id-001",
         "iat": iat,
         "ttl": ttl,
         "correlationId": correlation_id,
         "crit": ["iat", "ttl", "correlationId"],
-        "x5t#S256": payer_thumbprint
+        "x5t#S256": payer_thumbprint,
+        **({"x5c": payer_x5c} if payer_x5c else {})
     }
     
     if FAIL_JWS_CUSTOM:
@@ -571,7 +583,7 @@ def run_payer(fail_sig=False, fail_jws_custom=False, fail_iat=False, fail_ttl=Fa
             if field in headers:
                 del headers[field]
 
-    signed_jws = sign_jws_with_fail_logic(payload, private_key_pem, headers)
+    signed_jws = sign_jws_with_fail_logic(payload, private_key_pem, headers, payer_alg)
 
     # 5. Call the fetch method
     print(f"[*] Sending Payment Payload Request to {fetch_url}...")
@@ -663,7 +675,7 @@ def run_payer(fail_sig=False, fail_jws_custom=False, fail_iat=False, fail_ttl=Fa
                     # Refresh iat and ttl for the initiation message
                     headers["iat"] = int(time.time())
                     headers["ttl"] = (headers["iat"] * 1000) + 60000
-                    signed_init_notification = jws.sign(notification_payload, private_key_pem, headers=headers, algorithm='ES256')
+                    signed_init_notification = jws.sign(notification_payload, private_key_pem, headers=headers, algorithm=payer_alg)
                     
                     notify_url = payload_json.get("paymentNotification")
                     init_resp = requests.post(notify_url, data=signed_init_notification, headers={'Content-Type': 'application/jose'})
@@ -693,7 +705,7 @@ def run_payer(fail_sig=False, fail_jws_custom=False, fail_iat=False, fail_ttl=Fa
                                 # Refresh iat and ttl for the final message
                                 headers["iat"] = int(time.time())
                                 headers["ttl"] = (headers["iat"] * 1000) + 60000
-                                signed_final_notification = jws.sign(notification_payload, private_key_pem, headers=headers, algorithm='ES256')
+                                signed_final_notification = jws.sign(notification_payload, private_key_pem, headers=headers, algorithm=payer_alg)
                                 final_resp = requests.post(notify_url, data=signed_final_notification, headers={'Content-Type': 'application/jose'})
                                 if final_resp.status_code == 200:
                                     final_payload_bytes, final_resp_header = verify_jws(final_resp.text)

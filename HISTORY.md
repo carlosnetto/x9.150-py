@@ -2,6 +2,11 @@
 
 All notable changes to the X9.150 Secure Payment QR Code POC.
 
+## 2026-02-26
+- Replace hardcoded ES256 algorithm with dynamic `alg` from JWKS across `qr_server.py`, `qr_payer.py`, and `qr_appserver.py` — supports both ES256 (ECC) and RS256 (RSA) signing
+- Add `x5c` certificate chain to JWS protected headers (RFC 7515) and use it as a certificate discovery method in `verify_jws()`, enabling operation without certserv
+- Make `jku` conditional — only included in JWS headers when present in JWKS, preventing null URL fetch errors with X9 Financial PKI certificates
+
 ## 2026-02-25
 - Document Python 3.13 requirement — `coincurve` fails to build on Python 3.14+
 - `9fb5293` Update HISTORY.md with latest commits

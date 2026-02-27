@@ -37,7 +37,7 @@ def generate_key_pair(name, cert_url_base, output_folder, create_pem=False):
         format=serialization.PrivateFormat.PKCS8,
         encryption_algorithm=serialization.NoEncryption()
     )
-    with open(os.path.join(output_folder, f"{name}_key.txt"), "wb") as f:
+    with open(os.path.join(output_folder, f"{name}_key.pem"), "wb") as f:
         f.write(private_pem)
 
     # 3. Create a Self-Signed Certificate
@@ -102,7 +102,6 @@ def generate_key_pair(name, cert_url_base, output_folder, create_pem=False):
         "y": y,
         "use": "sig",
         "kid": f"{name}-key-id-001", # Unique identifier for the key
-        "jku": f"{cert_url_base}/{name}.jwks", # URL where the JWKS is hosted
         "x5t#S256": x5t_s256, # Thumbprint for integrity check
         "x5c": [x5c_val], # Embedded certificate to avoid extra HTTP hits
         "alg": "ES256"
@@ -113,7 +112,7 @@ def generate_key_pair(name, cert_url_base, output_folder, create_pem=False):
     with open(os.path.join(output_folder, f"{name}.jwks"), "w") as f:
         json.dump(jwks, f, indent=4)
 
-    files_created = [f"{name}_key.txt", f"{name}.csr", f"{name}.jwks"]
+    files_created = [f"{name}_key.pem", f"{name}.csr", f"{name}.jwks"]
     if create_pem:
         files_created.append(f"{name}_cert.pem")
     print(f"Successfully created keys in {output_folder}: {', '.join(files_created)}")

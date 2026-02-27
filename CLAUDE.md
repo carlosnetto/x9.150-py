@@ -10,8 +10,8 @@ Validates the ANSI X9.150 specification with EMVCo QR codes and JWS-based mutual
 
 | File | Description |
 |------|-------------|
-| `keygen.py` | Generates ECC key pairs, X.509 certificates, and JWKS metadata for payee and payer |
-| `certserv.py` | Flask server (port 5001) hosting public certificates and JWKS endpoints |
+| `keygen.py` | Generates ECC key pairs, self-signed X.509 certificates, and JWKS metadata for payee and payer |
+| `certserv.py` | Flask server (port 5001) hosting public certificates and JWKS endpoints (optional with X9 PKI certs) |
 | `qr_server.py` | Payee backend (port 5005) — serves `/fetch/` and `/notify/` endpoints with JWS |
 | `qr_payer.py` | Payer/wallet simulator — scans QR, verifies JWS, executes Solana USDC payment |
 | `qr_generator.py` | Reads a template, builds EMVCo QR string + JSON payload, writes to payee_db/payer_db |
@@ -25,7 +25,7 @@ Validates the ANSI X9.150 specification with EMVCo QR codes and JWS-based mutual
 ## Architecture — Three-Server Model
 
 ```
-certserv (5001)  ←  hosts JWKS / public certs
+certserv (5001)  ←  hosts JWKS / public certs (optional with X9 PKI certs)
 qr_server (5005) ←  payee backend (fetch + notify)
 qr_appserver (5010) ← app proxy (plain JSON, no JWS for clients)
 ```
@@ -42,9 +42,11 @@ qr_server  ⟵ notify ⟵ qr_payer (or qr_appserver)
 
 ## Security
 
-- **JWS ES256** signing on every request and response
-- **`jku`** header points to certserv for certificate discovery
-- **`x5t#S256`** thumbprint for efficient local caching and pinning
+- **JWS signing** on every request and response — algorithm read dynamically from JWKS (`alg` field: `ES256` for ECC, `RS256` for RSA)
+- **Certificate discovery** (in priority order):
+  1. **`x5t#S256`** thumbprint — local cache lookup
+  2. **`x5c`** header — certificate chain embedded in JWS (RFC 7515), used by X9 Financial PKI certificates
+  3. **`jku`** header — fetches JWKS from certserv (used by self-signed ECC certs from `keygen.py`)
 - **`iat` / `ttl`** headers enforce freshness (replay-attack prevention)
 - **`correlationId`** in protected header for non-repudiation and session tracking
 - **`crit`** header lists mandatory-to-understand custom claims
@@ -73,7 +75,7 @@ pip install -r requirements.txt
 # 1. Generate keys and certificates
 python keygen.py
 
-# 2. Start certificate server
+# 2. Start certificate server (only needed with self-signed ECC certs)
 python certserv.py
 
 # 3. Start payee server

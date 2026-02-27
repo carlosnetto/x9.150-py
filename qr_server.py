@@ -32,6 +32,8 @@ app = Flask(__name__)
 # In-memory state (loaded from file)
 private_key_pem = None
 payee_thumbprint = None
+payee_alg = "ES256"
+payee_x5c = None
 jwk_metadata = {}
 FAIL_SIGNATURE = False
 FAIL_CORRELATION_ID = False
@@ -64,14 +66,14 @@ def validate_against_spec(data, schema_name):
 
 def load_data():
     """Loads the generated ECC keys, certificates, and JWKS metadata."""
-    global private_key_pem, payee_thumbprint, jwk_metadata
+    global private_key_pem, payee_thumbprint, payee_alg, payee_x5c, jwk_metadata
 
     # 1. Load the Private Key
     try:
-        with open("payee_db/certs/payee_key.txt", "rb") as f:
+        with open("payee_db/certs/payee_key.pem", "rb") as f:
             private_key_pem = f.read()
     except FileNotFoundError:
-        print("QR_SERVER: [!] Error: payee_key.txt not found. Run keygen.py first.")
+        print("QR_SERVER: [!] Error: payee_key.pem not found. Run keygen.py first.")
         return False
 
     # 2. Load the JWKS metadata for JWS headers and thumbprint
@@ -80,6 +82,8 @@ def load_data():
             jwks = json.load(f)
             jwk_metadata = jwks["keys"][0]
             payee_thumbprint = jwk_metadata.get("x5t#S256")
+            payee_alg = jwk_metadata.get("alg", "ES256")
+            payee_x5c = jwk_metadata.get("x5c")
     except (FileNotFoundError, IndexError, KeyError):
         print("QR_SERVER: [!] Error: payee.jwks is missing or invalid.")
         return False
@@ -115,16 +119,17 @@ def sign_jws(payload, key_pem, correlation_id=None, is_fetch=False):
         effective_correlation_id = str(uuid.uuid4())
 
     headers = {
-        "alg": "ES256", # ECDSA using P-256 and SHA-256
+        "alg": payee_alg, # Algorithm from JWKS (ES256 for ECC, RS256 for RSA)
         "typ": "payresp+jws", # X9.150 specific type for payment responses
-        "jku": jwk_metadata.get("jku"),
         "kid": jwk_metadata.get("kid"),
+        **({"jku": jwk_metadata.get("jku")} if jwk_metadata.get("jku") else {}),
         "iat": iat, # Issued At: Prevents replay attacks
         "ttl": ttl_val, # Time To Live: Ensures the message is fresh
         # correlationId: Links the response to the original request for non-repudiation
         "correlationId": effective_correlation_id,
         "crit": ["correlationId", "iat", "ttl"],
-        "x5t#S256": payee_thumbprint
+        "x5t#S256": payee_thumbprint,
+        **({"x5c": payee_x5c} if payee_x5c else {})
     }
 
     if FAIL_JWS_CUSTOM:
@@ -138,7 +143,7 @@ def sign_jws(payload, key_pem, correlation_id=None, is_fetch=False):
             if field in headers:
                 del headers[field]
 
-    token = jws.sign(payload, key_pem, headers=headers, algorithm='ES256')
+    token = jws.sign(payload, key_pem, headers=headers, algorithm=payee_alg)
 
     if FAIL_SIGNATURE:
         print("QR_SERVER: [!] Testing Mode: Intentionally corrupting the signature (modifying the signature string).")
@@ -164,8 +169,17 @@ def verify_jws(token):
             with open(cache_path, "rb") as f:
                 cert = x509.load_pem_x509_certificate(f.read())
 
-    # 2. Try jku (JWK Set URL)
-    if not cert and 'jku' in header:
+    # 2. Try x5c from JWS header (certificate chain embedded by sender)
+    if not cert and 'x5c' in header:
+        try:
+            cert_der = base64.b64decode(header["x5c"][0])
+            cert = x509.load_der_x509_certificate(cert_der)
+            print(f"QR_SERVER: Using certificate from JWS x5c header")
+        except Exception:
+            pass
+
+    # 3. Try jku (JWK Set URL)
+    if not cert and header.get('jku'):
         print(f"QR_SERVER: Fetching certificate from {header['jku']}")
         r = requests.get(header['jku'])
         if r.status_code == 200:
@@ -188,7 +202,7 @@ def verify_jws(token):
         raise ValueError("No certificate found in JWS headers or cache")
 
     # Verify Signature
-    payload = jws.verify(token, cert.public_key(), algorithms=['ES256'])
+    payload = jws.verify(token, cert.public_key(), algorithms=['ES256', 'RS256'])
     
     # Update Cache
     if thumbprint and cert:

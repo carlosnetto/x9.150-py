@@ -61,17 +61,19 @@ def extract_fetch_url(emv_str):
 def load_payer_identity():
     """Loads the persistent Payer keys. Required to sign requests sent to the upstream qr_server."""
     try:
-        with open("payer_db/certs/payer_key.txt", "rb") as f:
+        with open("payer_db/certs/payer_key.pem", "rb") as f:
             private_pem = f.read()
         with open("payer_db/certs/payer.jwks", "r") as f:
             jwks = json.load(f)
             key = jwks["keys"][0]
             jku = key.get("jku")
             thumbprint = key.get("x5t#S256")
-        return private_pem, jku, thumbprint
+            alg = key.get("alg", "ES256")
+            x5c = key.get("x5c")
+        return private_pem, jku, thumbprint, alg, x5c
     except FileNotFoundError:
         print("QR_APPSERVER: [!] Error: Payer keys/certs not found.")
-        return None, None, None
+        return None, None, None, None, None
 
 def verify_jws(token):
     """Verifies a JWS using cache or jku. Required to validate the signed response from the upstream qr_server."""
@@ -86,7 +88,16 @@ def verify_jws(token):
             with open(cache_path, "rb") as f:
                 cert = x509.load_pem_x509_certificate(f.read())
 
-    if not cert and 'jku' in header:
+    # Try x5c from JWS header (certificate chain embedded by sender)
+    if not cert and 'x5c' in header:
+        try:
+            cert_der = base64.b64decode(header["x5c"][0])
+            cert = x509.load_der_x509_certificate(cert_der)
+            print(f"QR_APPSERVER: Using certificate from JWS x5c header")
+        except Exception:
+            pass
+
+    if not cert and header.get('jku'):
         print(f"QR_APPSERVER: Fetching certificate from {header['jku']}")
         r = requests.get(header['jku'])
         if r.status_code == 200:
@@ -105,7 +116,7 @@ def verify_jws(token):
     if not cert:
         raise ValueError("No certificate found in JWS headers or cache")
 
-    payload = jws.verify(token, cert.public_key(), algorithms=['ES256'])
+    payload = jws.verify(token, cert.public_key(), algorithms=['ES256', 'RS256'])
     
     if thumbprint and cert:
         calculated = base64.urlsafe_b64encode(hashlib.sha256(cert.public_bytes(serialization.Encoding.DER)).digest()).rstrip(b'=').decode('ascii')
@@ -251,25 +262,26 @@ def fetch_payment_details():
     
     validate_against_spec(payload, "FetchRequestPayload")
 
-    private_key_pem, payer_jku, payer_thumbprint = load_payer_identity()
+    private_key_pem, payer_jku, payer_thumbprint, payer_alg, payer_x5c = load_payer_identity()
     if not private_key_pem:
         return jsonify({"error": "Server identity not configured"}), 500
 
     iat = int(time.time())
     ttl = (iat * 1000) + 60000
     headers = {
-        "alg": "ES256",
+        "alg": payer_alg,
         "typ": "payreq+jws",
-        "jku": payer_jku,
+        **({"jku": payer_jku} if payer_jku else {}),
         "kid": "payer-key-id-001",
         "iat": iat,
         "ttl": ttl,
         "correlationId": correlation_id,
         "crit": ["iat", "ttl", "correlationId"],
-        "x5t#S256": payer_thumbprint
+        "x5t#S256": payer_thumbprint,
+        **({"x5c": payer_x5c} if payer_x5c else {})
     }
 
-    token = jws.sign(payload, private_key_pem, headers=headers, algorithm='ES256')
+    token = jws.sign(payload, private_key_pem, headers=headers, algorithm=payer_alg)
 
     try:
         resp = requests.post(fetch_url, data=token, headers={'Content-Type': 'application/jose'})
@@ -311,25 +323,26 @@ def notify_payment():
     # Prepare JWS
     correlation_id = str(uuid.uuid4())
     
-    private_key_pem, payer_jku, payer_thumbprint = load_payer_identity()
+    private_key_pem, payer_jku, payer_thumbprint, payer_alg, payer_x5c = load_payer_identity()
     if not private_key_pem:
         return jsonify({"error": "Server identity not configured"}), 500
 
     iat = int(time.time())
     ttl = (iat * 1000) + 60000
     headers = {
-        "alg": "ES256",
+        "alg": payer_alg,
         "typ": "payreq+jws",
-        "jku": payer_jku,
+        **({"jku": payer_jku} if payer_jku else {}),
         "kid": "payer-key-id-001",
         "iat": iat,
         "ttl": ttl,
         "correlationId": correlation_id,
         "crit": ["iat", "ttl", "correlationId"],
-        "x5t#S256": payer_thumbprint
+        "x5t#S256": payer_thumbprint,
+        **({"x5c": payer_x5c} if payer_x5c else {})
     }
 
-    token = jws.sign(data, private_key_pem, headers=headers, algorithm='ES256')
+    token = jws.sign(data, private_key_pem, headers=headers, algorithm=payer_alg)
 
     notify_url = f"{QR_SERVER_BASE_URL}/notify/{payload_id}"
 

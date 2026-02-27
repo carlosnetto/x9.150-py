@@ -14,7 +14,7 @@ Validates the ANSI X9.150 specification with EMVCo QR codes and JWS-based mutual
 | `certserv.py` | Flask server (port 5001) hosting public certificates and JWKS endpoints (optional with X9 PKI certs) |
 | `qr_server.py` | Payee backend (port 5005) — serves `/fetch/` and `/notify/` endpoints with JWS |
 | `qr_payer.py` | Payer/wallet simulator — scans QR, verifies JWS, executes Solana USDC payment |
-| `qr_generator.py` | Reads a template, builds EMVCo QR string + JSON payload, writes to payee_db/payer_db |
+| `qr_generator.py` | Reads a template, validates against OpenAPI spec (exits on error), builds EMVCo QR string + JSON payload, writes to payee_db/payer_db |
 | `qr_parser.py` | Parses and validates EMVCo QR content strings, prints TLV structure |
 | `qr_appserver.py` | App developer proxy (port 5010) — plain-JSON gateway that handles JWS internally |
 | `qr_delete.py` | Utility to clean up generated QR codes and payloads from the databases |
@@ -103,6 +103,17 @@ python qr_payer.py
 | `--failjwscustom` | Payer | Randomly omits mandatory JWS headers (`iat`, `ttl`, `correlationId`) |
 | `--failCorrelationId` | Server | Returns mismatched `correlationId` to test non-repudiation |
 | `--sanctionedWallet` | Server | Blocks a specified blockchain address (403 on match) |
+
+## Test Templates (Intentionally Invalid)
+
+Templates 51–54 contain intentional spec violations for testing validation:
+
+| Template | Error Type |
+|----------|------------|
+| `51_bad_mcc.json` | MCC with letters (`58A2`) — violates `^\d{4}$` |
+| `52_bad_protection_type.json` | Invalid enum `clear` — not in `[tokenized, encrypted, plaintext]` |
+| `53_bad_phone.json` | Phone missing `+` prefix — violates E.164 pattern |
+| `54_bad_amount.json` | Negative amount (`-89`) — violates `minimum: 0` |
 
 ## Compatible Wallets
 

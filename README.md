@@ -123,6 +123,15 @@ The Payee Server (`qr_server.py`) and Payer Simulator (`qr_payer.py`) support sp
 *   `--failjwscustom`: (Payer only) Randomly omits one or more mandatory JWS headers (`iat`, `ttl`, `correlationId`) to test server-side validation of critical headers.
 *   `--sanctionedWallet`: (Server only) Specifies a blockchain address to block. If a payment notification is received from this address, the server returns a 403 error, simulating a sanctions hit.
 
+#### Invalid Templates for Validation Testing
+
+Templates 51–54 contain intentional spec violations to demonstrate how `qr_generator.py` and `qr_payer.py` catch bad payloads:
+
+*   `51_bad_mcc.json` — MCC with letters (`58A2`), violates `^\d{4}$`
+*   `52_bad_protection_type.json` — Invalid `protectionType` enum (`clear`)
+*   `53_bad_phone.json` — Phone missing `+` prefix, violates E.164
+*   `54_bad_amount.json` — Negative amount (`-89`), violates `minimum: 0`
+
 ### 7. Specification Documentation
 
 To facilitate the mapping between the technical OpenAPI specification and the X9.150 documentation, use the `dump_open_api.py` utility:
@@ -139,7 +148,7 @@ To understand the implementation, follow these files in order to see how the X9.
 
 1.  **`keygen.py` (The Trust Setup)**: Generates Elliptic Curve (ECC) keys and self-signed X.509 certificates into `payee_db/certs` and `payer_db/certs`. In X9.150, identity is bound to these certificates. This simulates the enrollment of a Merchant or Bank into the payment network. Alternatively, X9 Financial PKI RSA certificates can be placed directly in these directories.
 2.  **`certserv.py` (The Certificate Repository)**: Hosts public certificates and JWKS metadata from the `*_db/certs` folders. When using self-signed ECC certs, the Payer uses the `jku` (JWK Set URL) header to fetch the certificate from this server. When using X9 PKI certificates, this service is not needed — the `x5c` certificate chain is embedded in the JWS header instead.
-3.  **`qr_generator.py` (The Merchant POS)**: Creates the EMVCo-compliant QR string. It saves the secure JSON payload to `payee_db/qrs` (for the server) and the QR code to `payer_db/qrs` (for the payer to scan).
+3.  **`qr_generator.py` (The Merchant POS)**: Creates the EMVCo-compliant QR string. It validates the generated payload against the OpenAPI spec and stops with an error if validation fails. It saves the secure JSON payload to `payee_db/qrs` (for the server) and the QR code to `payer_db/qrs` (for the payer to scan).
 4.  **`qr_server.py` (The Payee Backend)**: The core logic. It loads keys from `payee_db/certs` and payloads from `payee_db/qrs`. It manages the `/fetch/` endpoint and the `/notify/` endpoint.
 5.  **`qr_payer.py` (The Wallet Simulator)**: Simulates the consumer's banking app. It scans QR codes from `payer_db/qrs` and loads its own identity from `payer_db/certs`. It performs the critical "Verification" step: checking the Merchant's JWS signature and validating the certificate before showing the "Pay" button to the user.
 6.  **`qr_appserver.py` (The App Developer Proxy)**: A gateway designed to simplify integration for mobile and web applications. It handles all JWS signing and verification internally, allowing the frontend to communicate using plain JSON.

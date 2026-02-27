@@ -2,6 +2,13 @@
 
 All notable changes to the X9.150 Secure Payment QR Code POC.
 
+## 2026-02-27
+- Fix template 10 (steakhouse): add missing `allowed` field in tip, convert range/presets from strings to integers
+- Fix template 11 (utility bill): add milliseconds to `dueDate` timestamp, add required `validUntil` to adjustment
+- Add intentionally invalid templates 51–54 for spec validation testing (bad MCC, invalid protectionType enum, missing phone `+` prefix, negative amount)
+- Make `qr_generator.py` exit with code 1 when OpenAPI spec validation fails instead of continuing to generate QR codes and payloads
+- Add explicit `[OK] JWS Signature Verified` log message to `qr_server.py` after successful signature verification on both `/fetch` and `/notify`
+
 ## 2026-02-26
 - Replace hardcoded ES256 algorithm with dynamic `alg` from JWKS across `qr_server.py`, `qr_payer.py`, and `qr_appserver.py` — supports both ES256 (ECC) and RS256 (RSA) signing
 - Add `x5c` certificate chain to JWS protected headers (RFC 7515) and use it as a certificate discovery method in `verify_jws()`, enabling operation without certserv

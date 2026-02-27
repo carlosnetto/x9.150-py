@@ -203,7 +203,8 @@ def verify_jws(token):
 
     # Verify Signature
     payload = jws.verify(token, cert.public_key(), algorithms=['ES256', 'RS256'])
-    
+    print(f"QR_SERVER: [OK] JWS Signature Verified ({header.get('alg')})")
+
     # Update Cache
     if thumbprint and cert:
         calculated_thumbprint = base64.urlsafe_b64encode(hashlib.sha256(cert.public_bytes(serialization.Encoding.DER)).digest()).rstrip(b'=').decode('ascii')

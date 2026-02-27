@@ -40,8 +40,10 @@ def validate_against_spec(data, schema_name):
     try:
         Draft7Validator(target_schema, registry=registry).validate(data)
         print(f"[OK] Created JSON validated against {schema_name}")
+        return True
     except Exception as e:
         print(f"[!] Spec Validation Error ({schema_name}): {e}")
+        return False
 
 CURRENCY_TO_NUMERIC = {
     "USD": "840",
@@ -181,7 +183,8 @@ if __name__ == "__main__":
     final_payload = create_payment_payload(template_data, emv_qr_string, txn_id, BASE_URL)
 
     # Validate the created payload against the spec
-    validate_against_spec(final_payload, "PaymentRequest")
+    if not validate_against_spec(final_payload, "PaymentRequest"):
+        exit(1)
 
     # Ensure output directories exist
     os.makedirs("payee_db/qrs", exist_ok=True)

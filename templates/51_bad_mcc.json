@@ -1,60 +1,43 @@
 {
     "creditor": {
-        "name": "Prime Cut Steakhouse",
-        "phone": "+17025550010",
-        "email": "info@primecut.com",
+        "name": "Brew & Bean Coffee",
+        "phone": "+14155550001",
+        "email": "orders@brewandbean.com",
         "address": {
-            "line1": "555 Grill Ave",
-            "city": "Las Vegas",
-            "state": "NV",
-            "postalCode": "89101",
+            "line1": "123 Market St",
+            "city": "San Francisco",
+            "state": "CA",
+            "postalCode": "94105",
             "country": "US"
         },
-        "MCC": "5812"
+        "MCC": "58A2"
     },
     "bill": {
         "paymentTiming": "immediate",
-        "description": "Dinner at Prime Cut Steakhouse",
+        "description": "Coffee and pastry at Brew & Bean Coffee",
         "order": {
-            "number": "STK-2026-010",
+            "number": "COF-2026-001",
             "date": "2026-01-16"
         },
         "amountDue": {
-            "amount": 155,
+            "amount": 56,
             "currency": "USD"
-        },
-        "tip": {
-            "allowed": true,
-            "range": {
-                "min": 0,
-                "max": 30
-            },
-            "presets": [
-                18,
-                20,
-                25,
-                30
-            ]
         }
     },
     "additionalInformation": [
         {
-            "key": "Ribeye Steak",
-            "value": "0.85"
+            "key": "Espresso",
+            "value": "0.30"
         },
         {
-            "key": "Mashed Potatoes",
-            "value": "0.35"
-        },
-        {
-            "key": "Red Wine",
-            "value": "0.35"
+            "key": "Blueberry Muffin",
+            "value": "0.26"
         }
     ],
     "paymentMethods": [
         {
             "currency": "USD",
-            "amount": 155,
+            "amount": 56,
             "networks": {
                 "FedNow": {
                     "routingNumber": "123456789",
@@ -70,7 +53,7 @@
         },
         {
             "currency": "USDC",
-            "amount": 1550000,
+            "amount": 560000,
             "networks": {
                 "Solana": {
                     "address": "emjE6JshbysqU93MiTVFpjUQSo6GHjEhUNCLrSBjuiC"

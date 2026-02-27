@@ -1,60 +1,60 @@
 {
     "creditor": {
-        "name": "Prime Cut Steakhouse",
-        "phone": "+17025550010",
-        "email": "info@primecut.com",
+        "name": "Big Burger Bar",
+        "phone": "12135550006",
+        "email": "hello@bigburger.com",
         "address": {
-            "line1": "555 Grill Ave",
-            "city": "Las Vegas",
-            "state": "NV",
-            "postalCode": "89101",
+            "line1": "789 Patty Blvd",
+            "city": "Los Angeles",
+            "state": "CA",
+            "postalCode": "90001",
             "country": "US"
         },
         "MCC": "5812"
     },
     "bill": {
         "paymentTiming": "immediate",
-        "description": "Dinner at Prime Cut Steakhouse",
+        "description": "Lunch at Big Burger Bar",
         "order": {
-            "number": "STK-2026-010",
+            "number": "BB-2026-006",
             "date": "2026-01-16"
         },
         "amountDue": {
-            "amount": 155,
+            "amount": 47,
             "currency": "USD"
         },
         "tip": {
             "allowed": true,
             "range": {
                 "min": 0,
-                "max": 30
+                "max": 25
             },
             "presets": [
+                15,
                 18,
                 20,
-                25,
-                30
+                22
             ]
         }
     },
     "additionalInformation": [
         {
-            "key": "Ribeye Steak",
-            "value": "0.85"
+            "key": "Double Cheeseburger",
+            "value": "0.25"
         },
         {
-            "key": "Mashed Potatoes",
-            "value": "0.35"
+            "key": "Fries",
+            "value": "0.12"
         },
         {
-            "key": "Red Wine",
-            "value": "0.35"
+            "key": "Coke",
+            "value": "0.10"
         }
     ],
     "paymentMethods": [
         {
             "currency": "USD",
-            "amount": 155,
+            "amount": 47,
             "networks": {
                 "FedNow": {
                     "routingNumber": "123456789",
@@ -70,7 +70,7 @@
         },
         {
             "currency": "USDC",
-            "amount": 1550000,
+            "amount": 470000,
             "networks": {
                 "Solana": {
                     "address": "emjE6JshbysqU93MiTVFpjUQSo6GHjEhUNCLrSBjuiC"

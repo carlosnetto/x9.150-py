@@ -1,60 +1,74 @@
 {
     "creditor": {
-        "name": "Prime Cut Steakhouse",
-        "phone": "+17025550010",
-        "email": "info@primecut.com",
+        "name": "CashApp",
+        "phone": "+13125550004",
+        "email": "tony@tonyspizza.com",
         "address": {
-            "line1": "555 Grill Ave",
-            "city": "Las Vegas",
-            "state": "NV",
-            "postalCode": "89101",
+            "line1": "1955 Broadway",
+            "city": "Oakland",
+            "state": "CA",
+            "postalCode": "94612",
             "country": "US"
+        },
+        "ultimateCreditor": {
+            "account": {
+                "id": "$TonysPizza",
+                "schemaName": "cashtag"
+            },
+            "name": "Tony's Pizza",
+            "address": {
+                "line1": "321 Deep Dish Ln",
+                "city": "Chicago",
+                "state": "IL",
+                "postalCode": "60601",
+                "country": "US"
+            }
         },
         "MCC": "5812"
     },
     "bill": {
         "paymentTiming": "immediate",
-        "description": "Dinner at Prime Cut Steakhouse",
+        "description": "Pizza order from Tony's Pizza",
         "order": {
-            "number": "STK-2026-010",
+            "number": "PIZ-2026-004",
             "date": "2026-01-16"
         },
         "amountDue": {
-            "amount": 155,
+            "amount": -89,
             "currency": "USD"
         },
         "tip": {
             "allowed": true,
             "range": {
                 "min": 0,
-                "max": 30
+                "max": 28
             },
             "presets": [
+                15,
                 18,
                 20,
-                25,
-                30
+                25
             ]
         }
     },
     "additionalInformation": [
         {
-            "key": "Ribeye Steak",
-            "value": "0.85"
+            "key": "Pepperoni Pizza",
+            "value": "0.50"
         },
         {
-            "key": "Mashed Potatoes",
-            "value": "0.35"
+            "key": "Garlic Knots",
+            "value": "0.24"
         },
         {
-            "key": "Red Wine",
-            "value": "0.35"
+            "key": "Diet Coke",
+            "value": "0.15"
         }
     ],
     "paymentMethods": [
         {
             "currency": "USD",
-            "amount": 155,
+            "amount": -89,
             "networks": {
                 "FedNow": {
                     "routingNumber": "123456789",
@@ -70,7 +84,7 @@
         },
         {
             "currency": "USDC",
-            "amount": 1550000,
+            "amount": -890000,
             "networks": {
                 "Solana": {
                     "address": "emjE6JshbysqU93MiTVFpjUQSo6GHjEhUNCLrSBjuiC"

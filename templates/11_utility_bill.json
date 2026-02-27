@@ -17,7 +17,7 @@
         "description": "Electricity service for January 2026",
         "invoice": {
             "number": "INV-2026-01-99887",
-            "dueDate": "2026-02-15T23:59:59Z",
+            "dueDate": "2026-02-15T23:59:59.000Z",
             "invoicee": {
                 "name": "Jane Smith",
                 "phone": "+19165558899",
@@ -37,7 +37,8 @@
             "adjustments": [
                 {
                     "explanation": "10% fee for late payment",
-                    "amount": 3
+                    "amount": 3,
+                    "validUntil": "2026-02-28T23:59:59.000Z"
                 }
             ]
         },

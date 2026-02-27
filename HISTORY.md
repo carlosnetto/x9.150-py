@@ -8,6 +8,7 @@ All notable changes to the X9.150 Secure Payment QR Code POC.
 - Add intentionally invalid templates 51–54 for spec validation testing (bad MCC, invalid protectionType enum, missing phone `+` prefix, negative amount)
 - Make `qr_generator.py` exit with code 1 when OpenAPI spec validation fails instead of continuing to generate QR codes and payloads
 - Add explicit `[OK] JWS Signature Verified` log message to `qr_server.py` after successful signature verification on both `/fetch` and `/notify`
+- Add USDC/Solana payment method to bookstore template (05)
 
 ## 2026-02-26
 - Replace hardcoded ES256 algorithm with dynamic `alg` from JWKS across `qr_server.py`, `qr_payer.py`, and `qr_appserver.py` — supports both ES256 (ECC) and RS256 (RSA) signing

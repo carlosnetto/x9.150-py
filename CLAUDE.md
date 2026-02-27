@@ -23,6 +23,7 @@ Validates the ANSI X9.150 specification with EMVCo QR codes and JWS-based mutual
 | `opencert.py` | Reads a JWKS file and displays the full `x5c` certificate chain with details and linkage verification |
 | `validatepair.py` | Validates that a private key (`*_key.pem`) matches its JWKS certificate — sign/verify test + thumbprint check |
 | `qr_appserver_test.py` | Test utility that exercises the app server endpoints |
+| `templates/51–54_bad_*.json` | Intentionally invalid templates for spec validation testing |
 
 ## Architecture — Three-Server Model
 

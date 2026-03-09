@@ -96,7 +96,7 @@ The wallet needs:
 
 The payer derives keys using BIP44 path `m/44'/501'/0'/0'`.
 
-### 6. Testing Options
+### 5. Testing Options
 
 The Payee Server (`qr_server.py`) and Payer Simulator (`qr_payer.py`) support specific flags for testing error handling:
 
@@ -116,7 +116,7 @@ Templates 51–54 contain intentional spec violations to demonstrate how `qr_gen
 *   `53_bad_phone.json` — Phone missing `+` prefix, violates E.164
 *   `54_bad_amount.json` — Negative amount (`-89`), violates `minimum: 0`
 
-### 7. Specification Documentation
+### 6. Specification Documentation
 
 To facilitate the mapping between the technical OpenAPI specification and the X9.150 documentation, use the `dump_open_api.py` utility:
 
@@ -166,11 +166,19 @@ The `qr_appserver.py` **does not handle wallets, mnemonics (12 words), or blockc
 #### 1. Generate QR Content (`/generate`)
 Used by a merchant-side app to generate a new QR code string from a template.
 *   **Request (POST)**: A JSON Payment Request template (compatible with `openapi.yaml`).
-*   **Returns**: 
+*   **Returns**:
     ```json
     {
         "qrContent": "00020101021226...",
         "filePath": "payer_db/qrs/..."
+    }
+    ```
+*   **Error** (invalid template):
+    ```json
+    {
+        "error": "QR generation failed due to an invalid payment template.",
+        "details": "[!] Spec Validation Error (PaymentRequest): ...",
+        "tip": "Please go to Settings and review your payment configuration (e.g. phone number, amount, currency)."
     }
     ```
 

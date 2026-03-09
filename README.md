@@ -42,7 +42,6 @@ This proves that QR code payments can be open, interoperable, and secure, and th
     *   Supports **multiple certificate discovery methods**: `x5c` header (certificate chain embedded in JWS), `jku` (JWK Set URL via certserv), and `x5t#S256` (thumbprint for local caching and pinning).
     *   Compatible with **X9 Financial PKI** RSA certificates and self-signed ECC certificates.
 *   **Explicit Routing**: Uses dedicated paths for payload retrieval (`/fetch/`) and notifications (`/notify/`) instead of a single broker endpoint.
-*   **Tunneling Support**: Easily integrates with tunneling services like `pinggy.io` for external device testing.
 *   **Certificate Server**: Includes a dedicated service to host public keys and JWKS metadata (optional when using X9 PKI certificates with `x5c` chains).
 *   **Blockchain Integration**: Payer simulation supports USDC payments on the Solana network.
 
@@ -96,16 +95,6 @@ The wallet needs:
 *   **SOL** — a small balance for transaction fees.
 
 The payer derives keys using BIP44 path `m/44'/501'/0'/0'`.
-
-### 5. External Access (e.g., Mobile Scanning)
-If you want to scan the QR code or access the web-app with a real mobile device, use a tunneling service.
-
-**Using pinggy** (Payee Server on port 5005):
-```bash
-ssh -p 443 -R0:localhost:5005 free.pinggy.io
-```
-
-This provides an external IP/URL that you can open in your mobile browser to test the end-to-end flow.
 
 ### 6. Testing Options
 

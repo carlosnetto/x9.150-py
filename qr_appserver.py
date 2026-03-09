@@ -187,13 +187,21 @@ def generate_qr():
     try:
         # Call qr_generator.py
         # We assume qr_generator.py is in the current working directory
-        cmd = [sys.executable, "qr_generator.py", tmp_path]
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        cmd = [sys.executable, os.path.join(script_dir, "qr_generator.py"), tmp_path]
         
         # If a domain is needed in the future, it could be passed here
         # cmd.append(domain) 
 
+        print(f"QR_APPSERVER: [DEBUG] Python executable: {sys.executable}")
+        print(f"QR_APPSERVER: [DEBUG] CWD for subprocess: {script_dir}")
         print(f"QR_APPSERVER: [DEBUG] Executing: {' '.join(cmd)}")
-        result = subprocess.run(cmd, capture_output=True, text=True)
+        result = subprocess.run(cmd, capture_output=True, text=True, cwd=script_dir)
+
+        print(f"QR_APPSERVER: [DEBUG] qr_generator return code: {result.returncode}")
+        print(f"QR_APPSERVER: [DEBUG] qr_generator stdout: {result.stdout.strip()}")
+        if result.stderr.strip():
+            print(f"QR_APPSERVER: [DEBUG] qr_generator stderr: {result.stderr.strip()}")
 
         if result.returncode != 0:
             print(f"QR_APPSERVER: [!] qr_generator failed: {result.stderr}")

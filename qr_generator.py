@@ -2,6 +2,7 @@
 # Purpose: Validate the X9.150 specification.
 # Not for production use; intended only to prove the spec.
 
+import sys
 import time
 import base64
 import uuid
@@ -160,6 +161,7 @@ def create_payment_payload(template, qr_content_string, payload_id, base_url):
     return payload
 
 if __name__ == "__main__":
+    print(f"[DEBUG] qr_generator started — Python: {sys.executable}, CWD: {os.getcwd()}")
     parser = argparse.ArgumentParser(description="X9 QR Code Generator")
     parser.add_argument("template", help="Path to the biller JSON template")
     parser.add_argument("domain", nargs="?", help="Optional external domain (e.g. random.pinggy.io)")

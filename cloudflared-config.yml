@@ -1,9 +1,0 @@
-tunnel: a04396d8-5ca2-40f8-9a67-d8206fbb74fe
-credentials-file: /Users/cnetto/.cloudflared/a04396d8-5ca2-40f8-9a67-d8206fbb74fe.json
-
-ingress:
-  - hostname: x9-api.materalab.us
-    service: http://localhost:5010
-
-  # Catch-all rule (required)
-  - service: http_status:404

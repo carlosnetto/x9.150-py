@@ -205,7 +205,11 @@ def generate_qr():
 
         if result.returncode != 0:
             print(f"QR_APPSERVER: [!] qr_generator failed: {result.stderr}")
-            return jsonify({"error": "qr_generator failed", "details": result.stderr}), 500
+            return jsonify({
+                "error": "QR generation failed due to an invalid payment template.",
+                "details": result.stderr.strip(),
+                "tip": "Please go to Settings and review your payment configuration (e.g. phone number, amount, currency)."
+            }), 500
 
         # Parse stdout to find the txt file path
         # Expected output line from qr_generator.py: 

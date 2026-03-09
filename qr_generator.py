@@ -43,7 +43,7 @@ def validate_against_spec(data, schema_name):
         print(f"[OK] Created JSON validated against {schema_name}")
         return True
     except Exception as e:
-        print(f"[!] Spec Validation Error ({schema_name}): {e}")
+        print(f"[!] Spec Validation Error ({schema_name}): {e}", file=sys.stderr)
         return False
 
 CURRENCY_TO_NUMERIC = {
